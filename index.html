@@ -1211,7 +1211,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsA.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsA, false, 'centripetal', 0.15);
+          const curve = makeLinearPath(segPtsA);
           const geo = new THREE.TubeGeometry(curve, segPtsA.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1226,7 +1226,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsB.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsB, false, 'centripetal', 0.15);
+          const curve = makeLinearPath(segPtsB);
           const geo = new THREE.TubeGeometry(curve, segPtsB.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1325,9 +1325,11 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
       case 'FEED': {
         const len = Math.max(parseFloat(step.p1) || 0, 0);
         if (len > 0.01) {
-          // v9: FEED = straight line. Only start + end point needed.
-          // Intermediate points cause TubeGeometry cross-section artifacts.
-          all.push(pos.clone().addScaledVector(fwd, len));
+          // Add intermediate points every 2mm for smooth tube rendering
+          const feedSegs = Math.max(Math.ceil(len / 2), 2);
+          for (let fi = 1; fi <= feedSegs; fi++) {
+            all.push(pos.clone().addScaledVector(fwd, len * fi / feedSegs));
+          }
           pos = all[all.length - 1].clone();
           totalLen += len;
         } else { all.push(pos.clone()); }
@@ -1534,7 +1536,7 @@ function buildWire() {
 
     const curve = new THREE.CatmullRomCurve3(cleanPts, false, 'centripetal', 0.5);
     const segs  = Math.max(cleanPts.length * 3, 30);
-    const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+    const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
 
     if (hasPenetration) {
       // 관통 시 빨간색으로 경고
@@ -1631,9 +1633,9 @@ function buildWire() {
       if (wireMesh) { wireGroup.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
       if (resolved.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(resolved, false, 'centripetal', 0.15);
+          const curve = makeLinearPath(resolved);
           const segs = Math.max(resolved.length * 3, 30);
-          const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+          const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
           wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
           wireMesh.castShadow = true;
           wireGroup.add(wireMesh);
@@ -1988,9 +1990,9 @@ function tickSimMode(dt) {
       
       // v8: Use tube geometry for sim mode too (more realistic)
       try {
-        const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.15);
+        const curve = makeLinearPath(transformed);
         const segs = Math.max(transformed.length * 2, 16);
-        const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 6, false);
+        const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
         const simWireMat = (MATS[matKey] || MATS.steel).clone();
         simWireMat.emissive = new THREE.Color(0x331166);
         simWireMat.emissiveIntensity = 0.15;
@@ -2101,9 +2103,9 @@ function resolveCollisions() {
   
   if (transformedNew.length >= 2) {
     try {
-      const curve = new THREE.CatmullRomCurve3(transformedNew, false, 'centripetal', 0.15);
+      const curve = makeLinearPath(transformedNew);
       const segs  = Math.max(transformedNew.length * 3, 30);
-      const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+      const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
       wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
       wireMesh.castShadow = true;
       wireGroup.add(wireMesh);
