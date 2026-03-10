@@ -1236,11 +1236,26 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
 function transformWireForMachine(rawPoints, upToIndex) {
   const endIdx = (upToIndex != null) ? Math.min(upToIndex, rawPoints.length - 1) : rawPoints.length - 1;
   if (endIdx < 0 || rawPoints.length === 0) return [];
-  const lastFormedPt = rawPoints[endIdx];
-  const offset = lastFormedPt.clone().negate();
+  
+  // 1. Find the direction of the last wire segment (= current feed direction)
+  let lastDir = new THREE.Vector3(1, 0, 0); // default = +X
+  if (endIdx >= 1) {
+    lastDir = rawPoints[endIdx].clone().sub(rawPoints[endIdx - 1]).normalize();
+    if (lastDir.length() < 0.001) lastDir.set(1, 0, 0);
+  }
+  
+  // 2. Calculate rotation from lastDir to +X (quill direction)
+  const quillDir = new THREE.Vector3(1, 0, 0);
+  const quat = new THREE.Quaternion();
+  quat.setFromUnitVectors(lastDir, quillDir);
+  
+  // 3. Apply: rotate all points around the last point, then translate last point to origin
+  const pivot = rawPoints[endIdx];
   const transformed = [];
   for (let i = 0; i <= endIdx; i++) {
-    transformed.push(rawPoints[i].clone().add(offset));
+    const p = rawPoints[i].clone().sub(pivot); // translate pivot to origin
+    p.applyQuaternion(quat);                   // rotate so last segment = +X
+    transformed.push(p);
   }
   return transformed;
 }
