@@ -770,13 +770,16 @@ function buildWire() {
     scene.add(wireMesh);
   } catch (e) { console.warn('TubeGeometry failed', e); }
 
-  // v5: Feed wire (from guide to center)
+  // v5: Feed wire (from guide to center) — 3D tube, same material as main wire
   const feedPts = generateFeedWire(wirePoints, wirePoints.length - 1);
   if (feedPts.length >= 2) {
-    const feedGeo = new THREE.BufferGeometry().setFromPoints(feedPts);
-    const feedMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
-    feedWireLine = new THREE.Line(feedGeo, feedMat);
-    scene.add(feedWireLine);
+    try {
+      const feedCurve = new THREE.CatmullRomCurve3(feedPts, false, 'catmullrom', 0.5);
+      const feedGeo = new THREE.TubeGeometry(feedCurve, 20, wd / 2, 8, false);
+      feedWireLine = new THREE.Mesh(feedGeo, MATS[matKey] || MATS.steel);
+      feedWireLine.castShadow = true;
+      scene.add(feedWireLine);
+    } catch(e) { console.warn('Feed wire tube failed', e); }
   }
 
   // Step labels (transformed positions)
@@ -971,15 +974,21 @@ function tickInstantMode(dt) {
     }
   }
 
-  // v5: Draw partial wire with machine-aligned transform
+  // v5: Draw partial wire with machine-aligned transform (3D tube)
   if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
   const n = Math.ceil(animProgress) + 1;
   const partialRaw = wirePoints.slice(0, n);
   const transformed = transformWireForMachine(partialRaw);
   if (transformed.length >= 2) {
-    const geo = new THREE.BufferGeometry().setFromPoints(transformed);
-    animLine = new THREE.Line(geo, ANIM_MAT);
-    scene.add(animLine);
+    try {
+      const wd2 = parseFloat(document.getElementById('wdiam').value) || 4;
+      const matKey2 = document.getElementById('wmat').value;
+      const animCurve = new THREE.CatmullRomCurve3(transformed, false, 'catmullrom', 0.5);
+      const animGeo = new THREE.TubeGeometry(animCurve, Math.max(transformed.length * 3, 20), wd2 / 2, 8, false);
+      animLine = new THREE.Mesh(animGeo, MATS[matKey2] || MATS.steel);
+      animLine.castShadow = true;
+      scene.add(animLine);
+    } catch(e) { console.warn('Anim tube failed', e); }
   }
 
   // Done
@@ -1064,16 +1073,22 @@ function tickSimMode(dt) {
   const pct = normalizedProgress * 100;
   document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
 
-  // Draw partial wire (transformed)
+  // Draw partial wire (transformed) — 3D tube
   if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
   const n = Math.min(ptIdx + 1, wirePoints.length);
   if (n >= 2) {
     const partialRaw = wirePoints.slice(0, n);
     const transformed = transformWireForMachine(partialRaw);
     if (transformed.length >= 2) {
-      const geo = new THREE.BufferGeometry().setFromPoints(transformed);
-      animLine = new THREE.Line(geo, ANIM_MAT_SIM);
-      scene.add(animLine);
+      try {
+        const wd3 = parseFloat(document.getElementById('wdiam').value) || 4;
+        const matKey3 = document.getElementById('wmat').value;
+        const simCurve = new THREE.CatmullRomCurve3(transformed, false, 'catmullrom', 0.5);
+        const simGeo = new THREE.TubeGeometry(simCurve, Math.max(transformed.length * 3, 20), wd3 / 2, 8, false);
+        animLine = new THREE.Mesh(simGeo, MATS[matKey3] || MATS.steel);
+        animLine.castShadow = true;
+        scene.add(animLine);
+      } catch(e) { console.warn('Sim tube failed', e); }
     }
   }
 
