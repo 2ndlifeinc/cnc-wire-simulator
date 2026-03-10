@@ -408,13 +408,13 @@ const AXIS_NAMES = ['X1','X2','X3','X4','X5','X6','X7','X8'];
 let machineGroup = null;
 let slideGroups = [];    // 8 slide groups (each: body + pin)
 let slidePivots = [];    // 8 pivot groups for radial movement
-const SLIDE_RETRACTED = 38; // distance from center when retracted
-const SLIDE_ADVANCED = 8;   // distance from center when advanced (pin touches wire)
-const SLIDE_LENGTH = 50;
-const SLIDE_WIDTH = 15;
-const SLIDE_HEIGHT = 8;
-const PIN_RADIUS = 2.5;
-const PIN_HEIGHT = 12;
+const SLIDE_RETRACTED = 18; // distance from center when retracted
+const SLIDE_ADVANCED = 4;   // distance from center when advanced (pin touches wire)
+const SLIDE_LENGTH = 18;
+const SLIDE_WIDTH = 6;
+const SLIDE_HEIGHT = 4;
+const PIN_RADIUS = 1.2;
+const PIN_HEIGHT = 6;
 
 function buildMachineHardware() {
   if (machineGroup) { scene.remove(machineGroup); }
@@ -422,22 +422,21 @@ function buildMachineHardware() {
   slideGroups = [];
   slidePivots = [];
 
-  // ── Central mounting plate (YZ plane, around origin)
+  // ── Central mounting plate (YZ plane, around origin) — compact size
   const plateMat = new THREE.MeshStandardMaterial({
     color: 0x333340, metalness: 0.7, roughness: 0.3,
-    transparent: true, opacity: 0.35, side: THREE.DoubleSide
+    transparent: true, opacity: 0.25, side: THREE.DoubleSide
   });
-  const plateGeo = new THREE.CircleGeometry(65, 48);
+  const plateGeo = new THREE.CircleGeometry(28, 48);
   const plate = new THREE.Mesh(plateGeo, plateMat);
-  // Plate in YZ plane (facing X direction = wire feed direction)
   plate.rotation.y = Math.PI / 2;
   machineGroup.add(plate);
 
   // Outer ring
-  const ringGeo = new THREE.RingGeometry(63, 66, 48);
+  const ringGeo = new THREE.RingGeometry(27, 29, 48);
   const ringMat = new THREE.MeshStandardMaterial({
     color: 0x555566, metalness: 0.8, roughness: 0.2,
-    transparent: true, opacity: 0.5, side: THREE.DoubleSide
+    transparent: true, opacity: 0.4, side: THREE.DoubleSide
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.rotation.y = Math.PI / 2;
@@ -445,7 +444,7 @@ function buildMachineHardware() {
 
   // ── Bending die/pin at center
   const dieMat = new THREE.MeshStandardMaterial({ color: 0xddaa33, metalness: 0.9, roughness: 0.15 });
-  const dieGeo = new THREE.CylinderGeometry(2, 2, 10, 12);
+  const dieGeo = new THREE.CylinderGeometry(1.2, 1.2, 6, 12);
   const die = new THREE.Mesh(dieGeo, dieMat);
   // Standing along X axis (wire feed axis)
   die.rotation.z = Math.PI / 2;
@@ -453,35 +452,29 @@ function buildMachineHardware() {
   machineGroup.add(die);
 
   // Small secondary pin offset
-  const die2Geo = new THREE.CylinderGeometry(1.5, 1.5, 8, 10);
+  const die2Geo = new THREE.CylinderGeometry(0.8, 0.8, 5, 10);
   const die2 = new THREE.Mesh(die2Geo, dieMat);
   die2.rotation.z = Math.PI / 2;
-  die2.position.set(0, 4, 0);
+  die2.position.set(0, 2.5, 0);
   machineGroup.add(die2);
 
-  // ── Wire guide tube (from +X direction into center)
+  // ── Wire guide tube (small nozzle, from +X into center)
   const guideMat = new THREE.MeshStandardMaterial({
-    color: 0x88aacc, metalness: 0.5, roughness: 0.3,
-    transparent: true, opacity: 0.3
+    color: 0x667788, metalness: 0.7, roughness: 0.2
   });
-  const guideOuter = 5, guideInner = 3, guideLen = 80;
-  // Tube along X axis from center to +X
-  const guidePts = [];
-  for (let i = 0; i <= 20; i++) {
-    guidePts.push(new THREE.Vector3(8 + (i/20) * guideLen, 0, 0));
-  }
-  const guideCurve = new THREE.CatmullRomCurve3(guidePts);
-  const guideGeo = new THREE.TubeGeometry(guideCurve, 20, guideOuter, 12, false);
+  const guideLen = 25;
+  const guideGeo = new THREE.CylinderGeometry(1.8, 2.2, guideLen, 12);
   const guideMesh = new THREE.Mesh(guideGeo, guideMat);
+  guideMesh.rotation.z = Math.PI / 2;
+  guideMesh.position.set(8 + guideLen/2, 0, 0);
   machineGroup.add(guideMesh);
 
-  // Inner bore (darker)
-  const guideInnerMat = new THREE.MeshStandardMaterial({
-    color: 0x111122, metalness: 0.3, roughness: 0.5,
-    transparent: true, opacity: 0.4
-  });
-  const guideInnerGeo = new THREE.TubeGeometry(guideCurve, 20, guideInner, 12, false);
+  // Inner bore (dark hole)
+  const guideInnerMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const guideInnerGeo = new THREE.CylinderGeometry(1.0, 1.0, guideLen + 2, 12);
   const guideInnerMesh = new THREE.Mesh(guideInnerGeo, guideInnerMat);
+  guideInnerMesh.rotation.z = Math.PI / 2;
+  guideInnerMesh.position.set(8 + guideLen/2, 0, 0);
   machineGroup.add(guideInnerMesh);
 
   // ── 8 Axis Slides (radial around YZ plane)
