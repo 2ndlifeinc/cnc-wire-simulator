@@ -1237,11 +1237,15 @@ function transformWireForMachine(rawPoints, upToIndex) {
   const endIdx = (upToIndex != null) ? Math.min(upToIndex, rawPoints.length - 1) : rawPoints.length - 1;
   if (endIdx < 0 || rawPoints.length === 0) return [];
   
-  // 1. Find the direction of the last wire segment (= current feed direction)
+  // 1. Find the direction of the last meaningful wire segment
+  // Skip duplicate points (CUT/SOL add same-position points)
   let lastDir = new THREE.Vector3(1, 0, 0); // default = +X
-  if (endIdx >= 1) {
-    lastDir = rawPoints[endIdx].clone().sub(rawPoints[endIdx - 1]).normalize();
-    if (lastDir.length() < 0.001) lastDir.set(1, 0, 0);
+  for (let k = endIdx; k >= 1; k--) {
+    const d = rawPoints[k].clone().sub(rawPoints[k - 1]);
+    if (d.length() > 0.01) {
+      lastDir = d.normalize();
+      break;
+    }
   }
   
   // 2. Calculate rotation from lastDir to +X (quill direction)
