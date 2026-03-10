@@ -1130,24 +1130,21 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
         const axN = parseInt(step.axis) || 1;
         const travel = parseFloat(step.p1) || 0;
         if (Math.abs(travel) > 0.01) {
-          // ★ v8 FIXED: fwd/up are ALWAYS the nozzle direction — never change.
-          // Axes are fixed on the machine frame, so bend directions are always
-          // calculated from the same fwd/up/right (nozzle coordinate system).
           const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
           const bDir = getBendDir(axN, up, right);
           
           const R = wireDiam * bendRFactor;
           const angDeg = (travel / 10) * 90 * (4.0 / wireDiam);
-          
-          // Generate arc at current pos, bending from fwd toward bDir
           const res = generateArc(pos, fwd, up, bDir, angDeg, R);
           res.pts.forEach(p => all.push(p));
           if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
           
-          // ★ KEY: Do NOT update fwd or up. The nozzle direction is fixed.
-          // Next FEED will go from pos (arc endpoint) in the original fwd direction.
-          // This creates the correct shape: straight sections are always parallel,
-          // with bends connecting them.
+          // Update fwd/up to follow the arc — this is correct!
+          // BEND changes the wire direction. Next FEED goes in the NEW direction.
+          // The visual "straight from quill" effect is handled by transformWireForMachine
+          // which places the last formed point at the origin.
+          fwd = res.newFwd;
+          up = res.newUp;
           totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
         } else { all.push(pos.clone()); }
         break;
