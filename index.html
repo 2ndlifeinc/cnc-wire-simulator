@@ -1278,10 +1278,15 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
 // Piecewise-linear path — no spline wobble on straight sections
 function makeLinearPath(points) {
   const path = new THREE.CurvePath();
+  if (!points || points.length < 2) return path;
   for (let i = 0; i < points.length - 1; i++) {
     // Skip zero-length segments (e.g. CUT adds duplicate point)
     if (points[i].distanceTo(points[i + 1]) < 0.001) continue;
     path.add(new THREE.LineCurve3(points[i], points[i + 1]));
+  }
+  // Fallback: if all segments were zero-length, add at least one tiny segment
+  if (path.curves.length === 0 && points.length >= 2) {
+    path.add(new THREE.LineCurve3(points[0], points[points.length - 1]));
   }
   return path;
 }
@@ -1534,8 +1539,9 @@ function buildWire() {
     }
     if (cleanPts.length < 2) { updateStats(res); return; }
 
-    const curve = new THREE.CatmullRomCurve3(cleanPts, false, 'centripetal', 0.5);
+    const curve = makeLinearPath(cleanPts);
     const segs  = Math.max(cleanPts.length * 3, 30);
+    if (curve.curves.length === 0) { updateStats(res); return; }
     const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
 
     if (hasPenetration) {
