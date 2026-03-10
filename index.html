@@ -243,47 +243,55 @@ input.si.wide{width:54px;}
 /* Responsive */
 @media(max-width:750px){
   #main{flex-direction:column-reverse;}
-  #lp{width:100%;max-height:40vh;border-right:none;border-top:2px solid var(--border);overflow-y:auto;}
-  #rp{flex:1;min-height:45vh;}
+  #lp{width:100%;max-height:50vh;border-right:none;border-top:2px solid var(--border);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #rp{flex:1;min-height:40vh;}
   
   /* Header: compact */
-  #hdr{padding:4px 6px;gap:3px;}
-  .tabs{display:none;} /* hide machine tabs on mobile - not enough space */
-  .tab{padding:0 8px;font-size:10px;min-height:36px;}
-  .cb{padding:0 8px;font-size:11px;min-height:40px;}
-  .mode-btn{padding:0 6px;font-size:10px;min-height:40px;}
-  #stepind{font-size:10px;min-width:70px;}
+  #hdr{padding:6px 8px;gap:4px;flex-wrap:wrap;}
+  .tabs{display:none;}
+  .tab{padding:0 10px;font-size:12px;min-height:44px;}
+  .cb{padding:0 10px;font-size:13px;min-height:44px;}
+  .mode-btn{padding:0 8px;font-size:12px;min-height:44px;}
+  #stepind{font-size:12px;min-width:80px;}
   
   /* Left panel sections */
-  .sec{padding:6px 8px;}
-  .sectitle{font-size:9px;margin-bottom:4px;}
-  .wsettings{gap:4px;}
-  .wsettings label{font-size:10px;}
+  .sec{padding:8px 10px;}
+  .sectitle{font-size:11px;margin-bottom:6px;}
+  .wsettings{gap:6px;}
+  .wsettings label{font-size:12px;}
+  .wsettings input,.wsettings select{font-size:16px !important;min-height:44px !important;} /* 16px = iOS zoom 방지 */
   
-  /* Step editor rows */
-  .steprow{padding:4px 6px;gap:3px;flex-wrap:wrap;}
-  .stepnum{font-size:10px;min-width:18px;}
-  select.si,input.si{font-size:11px;min-height:32px;}
-  select.si{min-width:50px;}
-  input.si{width:40px;}
-  .slabel{font-size:9px;}
-  .sdel{min-width:28px;min-height:28px;font-size:14px;}
+  /* Step editor rows — 터치 친화적 */
+  .steprow{padding:8px 8px;gap:5px;flex-wrap:wrap;min-height:50px;}
+  .stepnum{font-size:12px;min-width:22px;min-height:36px;display:flex;align-items:center;}
+  select.si,input.si{font-size:16px !important;min-height:44px !important;padding:4px 6px;border-radius:6px;} /* 16px = iOS zoom 방지 */
+  select.si{min-width:56px;}
+  input.si{width:50px;}
+  .slabel{font-size:11px;}
+  .sdel{min-width:36px;min-height:36px;font-size:18px;border-radius:8px;}
   
   /* Presets */
-  .presets button{font-size:10px;padding:4px 8px;min-height:32px;}
+  .presets{flex-wrap:wrap;}
+  .presets button{font-size:12px;padding:8px 12px;min-height:44px;flex:1;min-width:80px;}
   
   /* Zoom slider */
-  #zoom-slider{width:70px !important;}
+  #zoom-slider{width:90px !important;height:30px;}
   
   /* Speed wrap */
-  .speed-wrap{font-size:9px;}
-  .speed-wrap input[type=range]{width:50px;}
+  .speed-wrap{font-size:11px;}
+  .speed-wrap input[type=range]{width:70px;height:30px;}
   
   /* Physics panel */
-  #physics-info{font-size:10px;padding:4px 8px;}
+  #physics-info{font-size:11px;padding:6px 10px;}
+  
+  /* 3D labels bigger on mobile */
+  .slbl{font-size:11px !important;padding:3px 6px !important;}
   
   /* Floating toggle for editor */
   #mobile-toggle{display:flex !important;}
+  
+  /* Add step buttons bigger */
+  .add-step-row button,.add-step-row select{min-height:44px !important;font-size:14px !important;padding:6px 12px;}
 }
 
 /* Mobile editor toggle button */
@@ -1106,7 +1114,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsA.length >= 2) {
         try {
-          const curve = makeLinearPath(segPtsA);
+          const curve = new THREE.CatmullRomCurve3(segPtsA, false, 'centripetal', 0.5);
           const geo = new THREE.TubeGeometry(curve, segPtsA.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1121,7 +1129,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsB.length >= 2) {
         try {
-          const curve = makeLinearPath(segPtsB);
+          const curve = new THREE.CatmullRomCurve3(segPtsB, false, 'centripetal', 0.5);
           const geo = new THREE.TubeGeometry(curve, segPtsB.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1413,7 +1421,7 @@ function buildWire() {
 
   // Tube mesh
   try {
-    const curve = makeLinearPath(transformed);
+    const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.5);
     const segs  = Math.max(transformed.length * 3, 30);
     const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
     wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
@@ -1490,7 +1498,7 @@ function buildWire() {
       if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
       if (resolved.length >= 2) {
         try {
-          const curve = makeLinearPath(resolved);
+          const curve = new THREE.CatmullRomCurve3(resolved, false, 'centripetal', 0.5);
           const segs = Math.max(resolved.length * 3, 30);
           const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
           wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
@@ -1847,7 +1855,7 @@ function tickSimMode(dt) {
       
       // v8: Use tube geometry for sim mode too (more realistic)
       try {
-        const curve = makeLinearPath(transformed);
+        const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.5);
         const segs = Math.max(transformed.length * 2, 16);
         const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 6, false);
         const simWireMat = (MATS[matKey] || MATS.steel).clone();
@@ -1960,7 +1968,7 @@ function resolveCollisions() {
   
   if (transformedNew.length >= 2) {
     try {
-      const curve = makeLinearPath(transformedNew);
+      const curve = new THREE.CatmullRomCurve3(transformedNew, false, 'centripetal', 0.5);
       const segs  = Math.max(transformedNew.length * 3, 30);
       const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
       wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
