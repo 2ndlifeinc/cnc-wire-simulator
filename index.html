@@ -757,9 +757,12 @@ function segmentSegmentDistance(A, B, C, D) {
 function detectCollisions(points, wireDiam) {
   const collisions = [];
   const threshold = wireDiam; // segments closer than wire diameter = collision
+  // Skip enough adjacent segments to avoid false positives within arcs
+  // A 180° arc can have ~36 segments, so skip at least 40
+  const skipGap = Math.max(40, Math.ceil(points.length * 0.15));
   
   for (let i = 0; i < points.length - 1; i++) {
-    for (let j = i + 3; j < points.length - 1; j++) { // skip adjacent (±2)
+    for (let j = i + skipGap; j < points.length - 1; j++) { // skip nearby segments
       const result = segmentSegmentDistance(
         points[i], points[i + 1],
         points[j], points[j + 1]
