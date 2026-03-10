@@ -231,10 +231,12 @@ input.si.wide{width:54px;}
 
 /* Step labels */
 .slbl{
-  background:rgba(0,200,100,.85);color:#000;padding:1px 5px;
-  font-size:9px;font-family:monospace;border-radius:2px;white-space:nowrap;font-weight:bold;
-  pointer-events:none;
+  background:rgba(0,200,100,.85);color:#000;padding:4px 8px;
+  font-size:10px;font-family:monospace;border-radius:3px;white-space:nowrap;font-weight:bold;
+  pointer-events:auto;cursor:pointer;user-select:none;
+  -webkit-tap-highlight-color:rgba(0,200,100,.3);
 }
+.slbl:active{background:rgba(0,255,136,1);transform:scale(1.1);}
 .slbl.rq{background:rgba(0,180,255,.85);}
 .slbl.cut{background:rgba(255,80,80,.85);color:#fff;}
 .slbl.sm{background:rgba(255,200,0,.85);}
@@ -1476,15 +1478,26 @@ function buildWire() {
     el.className = 'slbl ' + cls;
     el.style.cursor = 'pointer';
     el.textContent = String(mk.i).padStart(2,'0') + ' ' + mk.type + (mk.axis && mk.type==='BEND' ? mk.axis : '');
-    // Click label → jump to that step in editor
-    el.addEventListener('click', () => {
+    // Click/tap label → jump to that step in editor (works on mobile too)
+    const jumpToStep = () => {
+      // On mobile, ensure editor panel is visible
+      const lp = document.getElementById('lp');
+      if (lp.style.display === 'none') {
+        lp.style.display = 'flex';
+        const btn = document.getElementById('mobile-toggle');
+        if (btn) { btn.textContent = '🎬'; btn.title = '3D 뷰 확대'; }
+        onResize();
+      }
       const rows = document.querySelectorAll('.steprow');
       if (rows[mk.i]) {
         // Highlight and scroll to the step row
-        rows.forEach(r => r.style.outline = '');
+        rows.forEach(r => { r.style.outline = ''; r.style.background = ''; });
         rows[mk.i].style.outline = '2px solid var(--cyan)';
         rows[mk.i].style.background = '#0a2a3a';
-        rows[mk.i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Small delay to let layout settle, then scroll
+        setTimeout(() => {
+          rows[mk.i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
         // Remove highlight after 3s
         setTimeout(() => {
           if (rows[mk.i]) {
@@ -1493,7 +1506,9 @@ function buildWire() {
           }
         }, 3000);
       }
-    });
+    };
+    el.addEventListener('click', jumpToStep);
+    el.addEventListener('touchend', (e) => { e.preventDefault(); jumpToStep(); });
     const lobj = new CSS2DObject(el);
     const tpos = mk.pos.clone().add(offset);
     lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
