@@ -1326,7 +1326,26 @@ function buildWire() {
     const cls = ({'RQ':'rq','CUT':'cut','SM':'sm','SOL':'sol'})[mk.type] || '';
     const el = document.createElement('div');
     el.className = 'slbl ' + cls;
+    el.style.cursor = 'pointer';
     el.textContent = String(mk.i).padStart(2,'0') + ' ' + mk.type + (mk.axis && mk.type==='BEND' ? mk.axis : '');
+    // Click label → jump to that step in editor
+    el.addEventListener('click', () => {
+      const rows = document.querySelectorAll('.steprow');
+      if (rows[mk.i]) {
+        // Highlight and scroll to the step row
+        rows.forEach(r => r.style.outline = '');
+        rows[mk.i].style.outline = '2px solid var(--cyan)';
+        rows[mk.i].style.background = '#0a2a3a';
+        rows[mk.i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Remove highlight after 3s
+        setTimeout(() => {
+          if (rows[mk.i]) {
+            rows[mk.i].style.outline = '';
+            rows[mk.i].style.background = '';
+          }
+        }, 3000);
+      }
+    });
     const lobj = new CSS2DObject(el);
     const tpos = mk.pos.clone().add(offset);
     lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
