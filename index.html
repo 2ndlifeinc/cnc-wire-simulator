@@ -305,8 +305,8 @@ input.si.wide{width:54px;}
         </div>
         <!-- v6: Physics settings -->
         <div class="physics-row">
-          <label><input type="checkbox" id="chk-collision" checked> 충돌감지</label>
-          <label><input type="checkbox" id="chk-autocurl" checked> 자동 말림</label>
+          <label><input type="checkbox" id="chk-collision"> 충돌감지</label>
+          <label><input type="checkbox" id="chk-autocurl"> 자동 말림</label>
           <label>최소곡률 <input type="range" id="rng-mincurv" min="1" max="10" step="0.5" value="3"> <span class="pval" id="lbl-mincurv">3x</span></label>
         </div>
       </div>
@@ -399,8 +399,8 @@ let simSpeedMult = 1.0;
 let labelsVisible = true;
 
 // v6: physics state
-let collisionEnabled = true;
-let autoCurlEnabled = true; // v8: auto curl on collision
+let collisionEnabled = false;
+let autoCurlEnabled = false; // v8: auto curl on collision
 let minCurvatureMultiplier = 3.0;
 let collisionPoints = [];     // [{point, segA, segB}]
 let collisionSpheres = [];    // THREE.Mesh[]
@@ -1123,6 +1123,8 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
 function makeLinearPath(points) {
   const path = new THREE.CurvePath();
   for (let i = 0; i < points.length - 1; i++) {
+    // Skip zero-length segments (e.g. CUT adds duplicate point)
+    if (points[i].distanceTo(points[i + 1]) < 0.001) continue;
     path.add(new THREE.LineCurve3(points[i], points[i + 1]));
   }
   return path;
