@@ -120,7 +120,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .steprow.cut-row{border-left-color:#ff4444;background:#1a0808;}
 .steprow.collision{border-left-color:#ff0000;background:#2a0000;box-shadow:0 0 8px rgba(255,0,0,0.3);animation:collisionPulse 1s infinite;}
 .steprow.eng-warn{border-left-color:#ff6600;background:#2a1500;}
+.steprow.eng-block{border-left-color:#ff0000;background:#3a0000;box-shadow:0 0 12px rgba(255,0,0,0.4);}
 .steprow .eng-msg{display:block;font-size:10px;color:#ff6600;margin-top:2px;padding-left:24px;}
+.steprow.eng-block .eng-msg{color:#ff4444;}
+#sim-blocked{display:none;background:#3a0000;border:2px solid #ff0000;color:#ff4444;padding:8px 12px;margin:4px;border-radius:6px;font-size:12px;text-align:center;}
 @keyframes collisionPulse{0%,100%{box-shadow:0 0 8px rgba(255,0,0,0.3);}50%{box-shadow:0 0 15px rgba(255,0,0,0.6);}}
 .stepnum{color:var(--dim);font-size:11px;min-width:22px;}
 select.si,input.si{
@@ -336,6 +339,7 @@ input.si.wide{width:54px;}
         <div class="sectitle">프로그램 에디터 <span style="color:var(--dim);font-size:9px;" id="minfo">— 1번 기계</span></div>
       </div>
       <div id="se">
+        <div id="sim-blocked">🚫 물리적으로 불가능한 시퀀스 — 수정 필요</div>
         <div id="steplist"></div>
         <button class="addbtn" id="addstepbtn">+ 스텝 추가 (CUT 위에 삽입)</button>
       </div>
@@ -1400,6 +1404,17 @@ function buildWire() {
 
   updateStats(res);
 
+  // Check if wire goes behind quill (x > wireDiam in transformed coords = behind machine)
+  const quillThreshold = wd * 2; // small tolerance
+  let behindQuill = false;
+  for (let pi = 0; pi < transformed.length - 1; pi++) {
+    if (transformed[pi].x > quillThreshold) { behindQuill = true; break; }
+  }
+  if (behindQuill) {
+    // Tint wire red to show it's invalid
+    if (wireMesh) wireMesh.material = MAT_COLLISION;
+  }
+
   // v6: Collision detection + v8: Auto curl
   if (collisionEnabled) {
     collisionPoints = detectCollisions(transformed, wd, stepMarkers);
@@ -1951,10 +1966,13 @@ function delStep(id) {
 }
 
 // Engineering validation — checks each step for physical impossibility
+// Returns { warnings: [{idx, msgs}], blocked: boolean, blockMsg: string }
 function validateSteps(stepsArr) {
   const wd = parseFloat(document.getElementById('rng-diam')?.value) || 4;
   const R = wd * (parseFloat(document.getElementById('rng-rfactor')?.value) || 1.5);
-  const warnings = []; // [{idx, msg}]
+  const warnings = [];
+  let blocked = false;
+  let blockMsg = '';
   let lastType = null;
   let consecutiveBends = 0;
   let lastFeedLen = 0;
@@ -1962,6 +1980,7 @@ function validateSteps(stepsArr) {
 
   stepsArr.forEach((step, i) => {
     const msgs = [];
+    let isBlock = false;
 
     if (step.type === 'FEED') {
       const len = parseFloat(step.p1) || 0;
@@ -1981,20 +2000,27 @@ function validateSteps(stepsArr) {
       
       if (Math.abs(angle) > 170) {
         msgs.push(`🚫 벤드 ${Math.round(angle)}° > 170° — 물리적 한계 초과`);
+        isBlock = true;
       } else if (Math.abs(angle) > 135) {
         msgs.push(`⚠ 벤드 ${Math.round(angle)}° > 135° — 극한 벤딩, 스프링백 큼`);
       }
 
       if (lastType === 'BEND') {
         consecutiveBends++;
-        msgs.push(`⚠ 연속 벤드 ${consecutiveBends+1}회 — FEED 없이 연속 벤딩`);
+        if (consecutiveBends >= 2) {
+          msgs.push(`🚫 연속 벤드 ${consecutiveBends+1}회 — FEED 없이 연속 불가`);
+          isBlock = true;
+        } else {
+          msgs.push(`⚠ 연속 벤드 — FEED 삽입 권장`);
+        }
       } else {
         consecutiveBends = 0;
       }
 
       totalBendAngle += Math.abs(angle);
-      if (totalBendAngle > 350) {
-        msgs.push(`⚠ 누적 벤드 ${Math.round(totalBendAngle)}° — 와이어 사출기 뒤로 갈 수 있음`);
+      if (totalBendAngle > 300) {
+        msgs.push(`🚫 누적 벤드 ${Math.round(totalBendAngle)}° > 300° — 사출기 뒤로 관통`);
+        isBlock = true;
       }
 
       if (lastFeedLen > 0 && lastFeedLen < wd * 1.5 && lastType === 'FEED') {
@@ -2004,13 +2030,15 @@ function validateSteps(stepsArr) {
 
     if (step.type === 'CUT' && i === 0) {
       msgs.push(`🚫 첫 스텝이 CUT — FEED 먼저 필요`);
+      isBlock = true;
     }
 
     lastType = step.type;
-    if (msgs.length > 0) warnings.push({ idx: i, msgs });
+    if (msgs.length > 0) warnings.push({ idx: i, msgs, isBlock });
+    if (isBlock) { blocked = true; blockMsg = msgs.find(m => m.startsWith('🚫')) || msgs[0]; }
   });
 
-  return warnings;
+  return { warnings, blocked, blockMsg };
 }
 
 function setStep(id, k, v) {
@@ -2086,17 +2114,27 @@ function renderSteps() {
   });
 
   // Engineering validation
-  const warns = validateSteps(steps);
+  const validation = validateSteps(steps);
   const rows = list.querySelectorAll('.steprow');
-  warns.forEach(w => {
+  validation.warnings.forEach(w => {
     if (rows[w.idx]) {
-      rows[w.idx].classList.add('eng-warn');
+      rows[w.idx].classList.add(w.isBlock ? 'eng-block' : 'eng-warn');
       const msgEl = document.createElement('div');
       msgEl.className = 'eng-msg';
       msgEl.innerHTML = w.msgs.join('<br>');
       rows[w.idx].appendChild(msgEl);
     }
   });
+  // Show/hide blocked banner
+  const blockedEl = document.getElementById('sim-blocked');
+  if (blockedEl) {
+    if (validation.blocked) {
+      blockedEl.style.display = 'block';
+      blockedEl.textContent = '🚫 ' + validation.blockMsg;
+    } else {
+      blockedEl.style.display = 'none';
+    }
+  }
 }
 
 function buildParams(row, step) {
