@@ -1055,7 +1055,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsA.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsA, false, 'catmullrom', 0.5);
+          const curve = makeLinearPath(segPtsA);
           const geo = new THREE.TubeGeometry(curve, segPtsA.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1070,7 +1070,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsB.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsB, false, 'catmullrom', 0.5);
+          const curve = makeLinearPath(segPtsB);
           const geo = new THREE.TubeGeometry(curve, segPtsB.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1119,6 +1119,15 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Piecewise-linear path — no spline wobble on straight sections
+function makeLinearPath(points) {
+  const path = new THREE.CurvePath();
+  for (let i = 0; i < points.length - 1; i++) {
+    path.add(new THREE.LineCurve3(points[i], points[i + 1]));
+  }
+  return path;
+}
+
 // WIRE GENERATION (v6: with physics)
 // ══════════════════════════════════════════════════════════════════
 function generateArc(pos, forward, up, bendDir, bendDeg, R) {
@@ -1349,7 +1358,7 @@ function buildWire() {
 
   // Tube mesh
   try {
-    const curve = new THREE.CatmullRomCurve3(transformed, false, 'catmullrom', 0.5);
+    const curve = makeLinearPath(transformed);
     const segs  = Math.max(transformed.length * 3, 30);
     const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
     wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
@@ -1426,7 +1435,7 @@ function buildWire() {
       if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
       if (resolved.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(resolved, false, 'catmullrom', 0.5);
+          const curve = makeLinearPath(resolved);
           const segs = Math.max(resolved.length * 3, 30);
           const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
           wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
@@ -1783,7 +1792,7 @@ function tickSimMode(dt) {
       
       // v8: Use tube geometry for sim mode too (more realistic)
       try {
-        const curve = new THREE.CatmullRomCurve3(transformed, false, 'catmullrom', 0.5);
+        const curve = makeLinearPath(transformed);
         const segs = Math.max(transformed.length * 2, 16);
         const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 6, false);
         const simWireMat = (MATS[matKey] || MATS.steel).clone();
@@ -1896,7 +1905,7 @@ function resolveCollisions() {
   
   if (transformedNew.length >= 2) {
     try {
-      const curve = new THREE.CatmullRomCurve3(transformedNew, false, 'catmullrom', 0.5);
+      const curve = makeLinearPath(transformedNew);
       const segs  = Math.max(transformedNew.length * 3, 30);
       const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
       wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
