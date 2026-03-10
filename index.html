@@ -712,6 +712,7 @@ function buildMachineHardware() {
 
   scene.add(machineGroup);
   machineGroup.visible = axisVisible;
+  scene.add(wireGroup);
 }
 
 function updateSlidePositions() {
@@ -736,6 +737,7 @@ const ANIM_MAT = new THREE.LineBasicMaterial({ color: 0x00ff88, linewidth: 2 });
 const ANIM_MAT_SIM = new THREE.LineBasicMaterial({ color: 0xcc88ff, linewidth: 2 });
 
 let wireMesh = null;
+let wireGroup = new THREE.Group(); // holds wireMesh + labels, so rotation syncs
 let wireCollisionMesh = null; // red highlight segments
 let animLine = null;
 let feedWireLine = null;
@@ -1446,10 +1448,10 @@ function generateFeedWire() {
 // BUILD / CLEAR 3D WIRE
 // ══════════════════════════════════════════════════════════════════
 function clearWire() {
-  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+  if (wireMesh) { wireGroup.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
   if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
-  if (feedWireLine) { scene.remove(feedWireLine); feedWireLine.geometry.dispose(); feedWireLine = null; }
-  labelObjs.forEach(o => { o.element.remove(); scene.remove(o); });
+  if (feedWireLine) { wireGroup.remove(feedWireLine); feedWireLine.geometry.dispose(); feedWireLine = null; }
+  labelObjs.forEach(o => { o.element.remove(); wireGroup.remove(o); });
   labelObjs = [];
   cutPieces.forEach(p => { scene.remove(p); if(p.geometry) p.geometry.dispose(); });
   cutPieces = [];
@@ -1471,14 +1473,37 @@ function buildWire() {
 
   const transformed = transformWireForMachine(wirePoints);
 
+  // ★ 기계 관통 체크: X < 0인 포인트가 있으면 물리적으로 불가능
+  const hasPenetration = transformed.some(p => p.x < -wd);
+  if (hasPenetration) {
+    // X < 0 포인트를 X = 0으로 클램프 (기계 관통 방지)
+    transformed.forEach(p => { if (p.x < 0) p.x = 0; });
+  }
+
   // Tube mesh
   try {
-    const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.5);
-    const segs  = Math.max(transformed.length * 3, 30);
+    // 중복 포인트 제거
+    const cleanPts = [transformed[0]];
+    for (let k = 1; k < transformed.length; k++) {
+      if (transformed[k].distanceTo(transformed[k-1]) > 0.01) cleanPts.push(transformed[k]);
+    }
+    if (cleanPts.length < 2) { updateStats(res); return; }
+
+    const curve = new THREE.CatmullRomCurve3(cleanPts, false, 'centripetal', 0.5);
+    const segs  = Math.max(cleanPts.length * 3, 30);
     const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
-    wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
+
+    if (hasPenetration) {
+      // 관통 시 빨간색으로 경고
+      const warnMat = (MATS[matKey] || MATS.steel).clone();
+      warnMat.emissive = new THREE.Color(0x660000);
+      warnMat.emissiveIntensity = 0.5;
+      wireMesh = new THREE.Mesh(geo, warnMat);
+    } else {
+      wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
+    }
     wireMesh.castShadow = true;
-    scene.add(wireMesh);
+    wireGroup.add(wireMesh);
   } catch (e) { console.warn('TubeGeometry failed', e); }
 
   // Feed wire
@@ -1487,7 +1512,7 @@ function buildWire() {
     const feedGeo = new THREE.BufferGeometry().setFromPoints(feedPts);
     const feedMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
     feedWireLine = new THREE.Line(feedGeo, feedMat);
-    scene.add(feedWireLine);
+    wireGroup.add(feedWireLine);
   }
 
   // Step labels
@@ -1534,7 +1559,7 @@ function buildWire() {
     const lobj = new CSS2DObject(el);
     const tpos = mk.pos.clone().add(offset);
     lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
-    scene.add(lobj);
+    wireGroup.add(lobj);
     labelObjs.push(lobj);
     if (!labelsVisible) el.style.display = 'none';
   });
@@ -1560,7 +1585,7 @@ function buildWire() {
     if (autoCurlEnabled && collisionPoints.length > 0) {
       const resolved = resolveCollisionsWithCurl(transformed, wd, 5);
       // Update wire mesh with resolved points
-      if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+      if (wireMesh) { wireGroup.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
       if (resolved.length >= 2) {
         try {
           const curve = new THREE.CatmullRomCurve3(resolved, false, 'centripetal', 0.5);
@@ -1568,7 +1593,7 @@ function buildWire() {
           const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
           wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
           wireMesh.castShadow = true;
-          scene.add(wireMesh);
+          wireGroup.add(wireMesh);
         } catch(e) { console.warn('Auto-curl TubeGeometry failed', e); }
       }
       // Re-detect collisions after resolution
@@ -2038,7 +2063,7 @@ function resolveCollisions() {
       const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
       wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
       wireMesh.castShadow = true;
-      scene.add(wireMesh);
+      wireGroup.add(wireMesh);
     } catch (e) { console.warn('TubeGeometry failed', e); }
     
     // Feed wire
@@ -2047,7 +2072,7 @@ function resolveCollisions() {
       const feedGeo = new THREE.BufferGeometry().setFromPoints(feedPts);
       const feedMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
       feedWireLine = new THREE.Line(feedGeo, feedMat);
-      scene.add(feedWireLine);
+      wireGroup.add(feedWireLine);
     }
     
     // Re-check collisions
@@ -2066,7 +2091,7 @@ function resolveCollisions() {
       const lobj = new CSS2DObject(el);
       const tpos = mk.pos.clone().add(offset);
       lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
-      scene.add(lobj);
+      wireGroup.add(lobj);
       labelObjs.push(lobj);
       if (!labelsVisible) el.style.display = 'none';
     });
@@ -2762,7 +2787,7 @@ document.getElementById('wire-rot').addEventListener('input', e => {
   const deg = parseFloat(e.target.value);
   document.getElementById('wire-rot-lbl').textContent = deg + '°';
   if (wireMesh) {
-    wireMesh.rotation.x = THREE.MathUtils.degToRad(deg);
+    wireGroup.rotation.x = THREE.MathUtils.degToRad(deg);
   }
 });
 
