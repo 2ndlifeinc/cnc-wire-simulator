@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="pragma" content="no-cache">
-<meta http-equiv="expires" content="0">
 <title>CNC 와이어 포밍 시뮬레이터 v8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -14,60 +11,24 @@
   --green:#00ff88;--gdim:#00aa55;--cyan:#00d4ff;--yellow:#ffcc00;
   --red:#ff4444;--text:#ddd;--dim:#666;--font:'Courier New',monospace;
 }
-:root.light{
-  --bg:#f5f5f5;--panel:#ffffff;--row:#f0f0f0;--border:#d0d0d0;
-  --green:#008844;--gdim:#00aa55;--cyan:#0066aa;--yellow:#aa7700;
-  --red:#cc2222;--text:#222;--dim:#777;
-}
-:root.light #hdr{background:#e8e8e8;}
-:root.light .tab{background:#f0f0f0;color:#555;}
-:root.light .tab.on{background:#008844;color:#fff;}
-:root.light .cb{background:#f0f0f0;color:#333;}
-:root.light .cb:hover{background:#ddfce8;}
-:root.light .mode-btn{background:#f0f0f0;color:#555;}
-:root.light .mode-btn.on{background:#ddfce8;color:#006633;}
-:root.light select.si,
-:root.light input.si{background:#fff;color:#222;border-color:#bbb;}
-:root.light .steprow{background:#fafafa;border-color:#ddd;}
-:root.light .steprow:hover{background:#f0faf5;}
-:root.light .slbl{background:rgba(0,136,68,.85);color:#fff;}
-:root.light #physics-info{background:#fafafa;border-color:#ddd;}
-:root.light .physics-row label{color:#555;}
-:root.light #v6-badge{background:#e0f0e8;color:#006633;}
-:root.light #ftr{background:#e8e8e8;}
-:root.light #progress-bar-wrap{background:#ddd;}
-:root.light .steprow.cut-row{background:#fff0f0;}
-:root.light #photo-sec{background:var(--panel);}
-:root.light .upload-area{background:#f8f8ff;border-color:#bbb;color:#666;}
-:root.light #slack-tpl{background:#f0f4f8;border-color:#bbb;color:#446688;}
-:root.light ::-webkit-scrollbar-track{background:#eee;}
-:root.light ::-webkit-scrollbar-thumb{background:#ccc;}
-:root.light .sec{background:var(--panel);}
-:root.light .presets button{background:#f0f0f0;color:#333;border-color:#ccc;}
-:root.light .presets button:hover{background:#ddfce8;border-color:#008844;}
-:root.light .wlabel{color:#555;}
-:root.light .wi{background:#fff;color:#222;border-color:#bbb;}
-:root.light #sim-blocked{background:#fee;color:#c00;border-color:#faa;}
-:root.light .eng-warn{border-color:#cc8800 !important;background:#fff8e0 !important;}
-:root.light .eng-block{border-color:#cc0000 !important;background:#ffe0e0 !important;}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);}
 #app{display:flex;flex-direction:column;height:100vh;}
 
 /* Header */
 #hdr{
-  background:var(--bg);border-bottom:2px solid var(--gdim);
+  background:#0a0a0a;border-bottom:2px solid var(--gdim);
   padding:5px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;
 }
 .tabs{display:flex;gap:3px;}
 .tab{
-  background:var(--row);border:1px solid var(--border);color:var(--dim);
+  background:#181818;border:1px solid var(--border);color:var(--dim);
   padding:0 14px;cursor:pointer;font-family:var(--font);font-size:12px;transition:.15s;
   min-height:44px;display:flex;align-items:center;
 }
 .tab.on{background:var(--gdim);color:#000;border-color:var(--green);font-weight:bold;}
 .pbc{display:flex;gap:4px;align-items:center;margin-left:auto;flex-wrap:wrap;}
 .cb{
-  background:var(--row);border:1px solid var(--border);color:var(--text);
+  background:#1a1a1a;border:1px solid var(--border);color:var(--text);
   padding:0 11px;cursor:pointer;font-family:var(--font);font-size:12px;transition:.15s;
   min-height:44px;display:flex;align-items:center;white-space:nowrap;
 }
@@ -77,8 +38,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* Mode toggle group */
 .mode-group{display:flex;border:1px solid var(--border);overflow:hidden;}
-
-  background:var(--row);border:none;border-right:1px solid var(--border);color:var(--dim);
+.mode-btn{
+  background:#1a1a1a;border:none;border-right:1px solid var(--border);color:var(--dim);
   padding:0 10px;cursor:pointer;font-family:var(--font);font-size:11px;transition:.15s;
   min-height:44px;white-space:nowrap;
 }
@@ -112,7 +73,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .wg{display:flex;flex-direction:column;gap:2px;}
 .wlabel{font-size:10px;color:var(--dim);}
 .wi{
-  background:var(--bg);border:1px solid var(--border);color:var(--green);
+  background:#080808;border:1px solid var(--border);color:var(--green);
   padding:5px 7px;font-family:var(--font);font-size:12px;width:100%;min-height:38px;
 }
 .wi:focus{outline:none;border-color:var(--green);}
@@ -140,7 +101,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 /* Presets */
 .presets{display:flex;flex-wrap:wrap;gap:4px;}
 .prbtn{
-  background:var(--row);border:1px solid var(--border);color:var(--dim);
+  background:#181818;border:1px solid var(--border);color:#999;
   padding:0 10px;cursor:pointer;font-size:11px;font-family:var(--font);transition:.15s;
   min-height:36px;
 }
@@ -156,7 +117,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .steprow:hover{border-color:var(--border);}
 .steprow.playing{border-left-color:var(--yellow);background:#2a2400;box-shadow:0 0 10px rgba(255,204,0,0.25);}
 .steprow.done{border-left-color:var(--gdim);background:#0c1a10;}
-.steprow.cut-row{border-left-color:var(--red);background:var(--row);}
+.steprow.cut-row{border-left-color:#ff4444;background:#1a0808;}
 .steprow.collision{border-left-color:#ff0000;background:#2a0000;box-shadow:0 0 8px rgba(255,0,0,0.3);animation:collisionPulse 1s infinite;}
 .steprow.eng-warn{border-left-color:#ff6600;background:#2a1500;}
 .steprow.eng-block{border-left-color:#ff0000;background:#3a0000;box-shadow:0 0 12px rgba(255,0,0,0.4);}
@@ -166,7 +127,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 @keyframes collisionPulse{0%,100%{box-shadow:0 0 8px rgba(255,0,0,0.3);}50%{box-shadow:0 0 15px rgba(255,0,0,0.6);}}
 .stepnum{color:var(--dim);font-size:11px;min-width:22px;}
 select.si,input.si{
-  background:var(--bg);border:1px solid var(--border);color:var(--text);
+  background:#0c0c0c;border:1px solid #2a2a2a;color:var(--text);
   font-family:var(--font);font-size:11px;padding:3px 3px;height:36px;
 }
 select.si{min-width:62px;}
@@ -189,9 +150,9 @@ input.si.wide{width:54px;}
 /* Photo upload section */
 #photo-sec{border-bottom:1px solid var(--border);padding:8px 9px;}
 .photo-drop-area{
-  border:1px dashed var(--border);background:var(--row);padding:8px;text-align:center;
+  border:1px dashed #334;background:#080810;padding:8px;text-align:center;
   cursor:pointer;transition:.15s;min-height:44px;display:flex;align-items:center;justify-content:center;
-  flex-direction:column;gap:4px;color:var(--dim);
+  flex-direction:column;gap:4px;
 }
 .photo-drop-area:hover{border-color:var(--cyan);background:#080818;}
 .photo-drop-area span{font-size:12px;color:var(--cyan);}
@@ -205,7 +166,7 @@ input.si.wide{width:54px;}
 .shape-gen-btn:hover{background:#0f2a10;border-color:var(--green);}
 .shape-gen-btn:disabled{opacity:.5;cursor:not-allowed;}
 #photo-result{font-size:10px;color:var(--dim);margin-top:4px;line-height:1.6;min-height:14px;}
-#slack-tpl{background:var(--row);border:1px solid var(--border);padding:6px 8px;font-size:10px;color:var(--cyan);margin-top:5px;cursor:pointer;word-break:break-all;display:none;border-radius:2px;line-height:1.5;}
+#slack-tpl{background:#08081a;border:1px solid #334;padding:6px 8px;font-size:10px;color:#88aacc;margin-top:5px;cursor:pointer;word-break:break-all;display:none;border-radius:2px;line-height:1.5;}
 #slack-tpl:hover{border-color:var(--cyan);color:var(--cyan);}
 #slack-tpl::before{content:"📋 클릭하여 복사 → ";color:var(--dim);}
 
@@ -253,7 +214,7 @@ input.si.wide{width:54px;}
 /* Physics info panel */
 #physics-info{
   position:absolute;bottom:10px;right:10px;z-index:20;
-  background:rgba(var(--bg-rgb,9,9,9),0.88);border:1px solid var(--border);color:var(--dim);
+  background:rgba(8,8,8,0.88);border:1px solid #44444488;color:var(--dim);
   padding:4px 10px;font-family:var(--font);font-size:9px;backdrop-filter:blur(4px);
   line-height:1.6;max-width:220px;
 }
@@ -262,7 +223,7 @@ input.si.wide{width:54px;}
 
 /* Footer */
 #ftr{
-  background:var(--bg);border-top:1px solid var(--border);
+  background:#0a0a0a;border-top:1px solid var(--border);
   padding:4px 12px;display:flex;gap:20px;font-size:11px;color:var(--dim);flex-shrink:0;flex-wrap:wrap;
   align-items:center;
 }
@@ -377,7 +338,6 @@ input.si.wide{width:54px;}
       <input type="range" id="zoom-slider" min="10" max="500" step="5" value="140" style="width:100px;accent-color:var(--cyan);">
       <span id="zoom-lbl" style="color:var(--cyan);min-width:32px;font-size:11px;">1.0x</span>
     </div>
-    <button class="cb" id="btn-theme" title="라이트/다크 모드 전환" style="font-size:16px;padding:0 8px;">🌙</button>
   </div>
   <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
 
@@ -399,10 +359,10 @@ input.si.wide{width:54px;}
           <div class="wg"><span class="wlabel">벤딩 반경계수</span>
             <input class="wi" id="bradius" type="number" value="1.5" step="0.1" min="0.5" max="5"></div>
           <div class="wg"><span class="wlabel">스텝 라벨</span>
-            <div style="display:flex;gap:2px;">
-              <button class="cb label-btn on" id="lbl-show" style="flex:1;font-size:11px;padding:0 6px;">표시</button>
-              <button class="cb label-btn" id="lbl-hide" style="flex:1;font-size:11px;padding:0 6px;">숨김</button>
-            </div></div>
+            <select class="wi" id="showlabels">
+              <option value="1">표시</option>
+              <option value="0">숨김</option>
+            </select></div>
           <div class="wg" style="grid-column:1/3;"><span class="wlabel">퀼 회전</span>
             <input class="wi" id="quill-rot" type="range" min="0" max="360" step="1" value="0" style="width:100%;">
             <span id="quill-rot-lbl" style="font-size:10px;color:var(--cyan);">0°</span></div>
@@ -583,7 +543,6 @@ scene.add(pl2);
 
 // Grid
 const grid = new THREE.GridHelper(300, 60, 0x1a1a1a, 0x141414);
-grid.name = 'gridHelper';
 grid.position.y = -80;
 scene.add(grid);
 
@@ -660,33 +619,6 @@ function buildMachineHardware() {
   
   machineGroup.add(quillGroup);
 
-  // ── SPOOL/BARREL (사출기 통) — 뒤쪽, 앞뒤 구분용 ──
-  const barrelMat = new THREE.MeshStandardMaterial({
-    color: 0x555566, metalness: 0.6, roughness: 0.3,
-    transparent: true, opacity: 0.4
-  });
-  const barrelGeo = new THREE.CylinderGeometry(20, 20, 40, 16);
-  const barrel = new THREE.Mesh(barrelGeo, barrelMat);
-  barrel.rotation.z = Math.PI / 2;
-  barrel.position.x = 30; // behind quill (+X = behind machine)
-  machineGroup.add(barrel);
-  
-  // Barrel cap (dark end)
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x333344, metalness: 0.5, roughness: 0.4 });
-  const capGeo = new THREE.CircleGeometry(20, 16);
-  const cap = new THREE.Mesh(capGeo, capMat);
-  cap.rotation.y = -Math.PI / 2;
-  cap.position.x = 50;
-  machineGroup.add(cap);
-  
-  // Wire feed guide (small tube from barrel to quill)
-  const guideMat = new THREE.MeshStandardMaterial({ color: 0xaaaa66, metalness: 0.7, roughness: 0.2 });
-  const guideGeo = new THREE.CylinderGeometry(1.5, 1.5, 25, 8);
-  const guide = new THREE.Mesh(guideGeo, guideMat);
-  guide.rotation.z = Math.PI / 2;
-  guide.position.x = 20;
-  machineGroup.add(guide);
-
   const dieMat = new THREE.MeshStandardMaterial({ color: 0xddaa33, metalness: 0.9, roughness: 0.15 });
   const dieGeo = new THREE.CylinderGeometry(1.2, 1.2, 6, 12);
   const die = new THREE.Mesh(dieGeo, dieMat);
@@ -758,7 +690,6 @@ function buildMachineHardware() {
 
   scene.add(machineGroup);
   machineGroup.visible = axisVisible;
-  scene.add(wireGroup);
 }
 
 function updateSlidePositions() {
@@ -783,7 +714,6 @@ const ANIM_MAT = new THREE.LineBasicMaterial({ color: 0x00ff88, linewidth: 2 });
 const ANIM_MAT_SIM = new THREE.LineBasicMaterial({ color: 0xcc88ff, linewidth: 2 });
 
 let wireMesh = null;
-let wireGroup = new THREE.Group(); // holds wireMesh + labels, so rotation syncs
 let wireCollisionMesh = null; // red highlight segments
 let animLine = null;
 let feedWireLine = null;
@@ -1214,7 +1144,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsA.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsA, false, 'chordal', 0.5);
+          const curve = new THREE.CatmullRomCurve3(segPtsA, false, 'centripetal', 0.5);
           const geo = new THREE.TubeGeometry(curve, segPtsA.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1229,7 +1159,7 @@ function showCollisionVisuals(collisions, transformedPoints, wireDiam) {
       
       if (segPtsB.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(segPtsB, false, 'chordal', 0.5);
+          const curve = new THREE.CatmullRomCurve3(segPtsB, false, 'centripetal', 0.5);
           const geo = new THREE.TubeGeometry(curve, segPtsB.length * 3, wireDiam * 0.55, 8, false);
           const mesh = new THREE.Mesh(geo, MAT_COLLISION);
           scene.add(mesh);
@@ -1281,15 +1211,10 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
 // Piecewise-linear path — no spline wobble on straight sections
 function makeLinearPath(points) {
   const path = new THREE.CurvePath();
-  if (!points || points.length < 2) return path;
   for (let i = 0; i < points.length - 1; i++) {
     // Skip zero-length segments (e.g. CUT adds duplicate point)
     if (points[i].distanceTo(points[i + 1]) < 0.001) continue;
     path.add(new THREE.LineCurve3(points[i], points[i + 1]));
-  }
-  // Fallback: if all segments were zero-length, add at least one tiny segment
-  if (path.curves.length === 0 && points.length >= 2) {
-    path.add(new THREE.LineCurve3(points[0], points[points.length - 1]));
   }
   return path;
 }
@@ -1333,11 +1258,9 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
       case 'FEED': {
         const len = Math.max(parseFloat(step.p1) || 0, 0);
         if (len > 0.01) {
-          // Add intermediate points every 2mm for smooth tube rendering
-          const feedSegs = Math.max(Math.ceil(len / 2), 2);
-          for (let fi = 1; fi <= feedSegs; fi++) {
-            all.push(pos.clone().addScaledVector(fwd, len * fi / feedSegs));
-          }
+          // v9: FEED = straight line. Only start + end point needed.
+          // Intermediate points cause TubeGeometry cross-section artifacts.
+          all.push(pos.clone().addScaledVector(fwd, len));
           pos = all[all.length - 1].clone();
           totalLen += len;
         } else { all.push(pos.clone()); }
@@ -1501,10 +1424,10 @@ function generateFeedWire() {
 // BUILD / CLEAR 3D WIRE
 // ══════════════════════════════════════════════════════════════════
 function clearWire() {
-  if (wireMesh) { wireGroup.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
   if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
-  if (feedWireLine) { wireGroup.remove(feedWireLine); feedWireLine.geometry.dispose(); feedWireLine = null; }
-  labelObjs.forEach(o => { o.element.remove(); wireGroup.remove(o); });
+  if (feedWireLine) { scene.remove(feedWireLine); feedWireLine.geometry.dispose(); feedWireLine = null; }
+  labelObjs.forEach(o => { o.element.remove(); scene.remove(o); });
   labelObjs = [];
   cutPieces.forEach(p => { scene.remove(p); if(p.geometry) p.geometry.dispose(); });
   cutPieces = [];
@@ -1526,38 +1449,14 @@ function buildWire() {
 
   const transformed = transformWireForMachine(wirePoints);
 
-  // ★ 기계 관통 체크: X < 0인 포인트가 있으면 물리적으로 불가능
-  const hasPenetration = transformed.some(p => p.x < -wd);
-  if (hasPenetration) {
-    // X < 0 포인트를 X = 0으로 클램프 (기계 관통 방지)
-    transformed.forEach(p => { if (p.x < 0) p.x = 0; });
-  }
-
   // Tube mesh
   try {
-    // 중복 포인트 제거
-    const cleanPts = [transformed[0]];
-    for (let k = 1; k < transformed.length; k++) {
-      if (transformed[k].distanceTo(transformed[k-1]) > 0.01) cleanPts.push(transformed[k]);
-    }
-    if (cleanPts.length < 2) { updateStats(res); return; }
-
-    const curve = new THREE.CatmullRomCurve3(cleanPts, false, 'chordal', 0.5);
-    const segs  = Math.max(cleanPts.length * 3, 30);
-    if (cleanPts.length < 2) { updateStats(res); return; }
-    const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
-
-    if (hasPenetration) {
-      // 관통 시 빨간색으로 경고
-      const warnMat = (MATS[matKey] || MATS.steel).clone();
-      warnMat.emissive = new THREE.Color(0x660000);
-      warnMat.emissiveIntensity = 0.5;
-      wireMesh = new THREE.Mesh(geo, warnMat);
-    } else {
-      wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
-    }
+    const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.5);
+    const segs  = Math.max(transformed.length * 3, 30);
+    const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+    wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
     wireMesh.castShadow = true;
-    wireGroup.add(wireMesh);
+    scene.add(wireMesh);
   } catch (e) { console.warn('TubeGeometry failed', e); }
 
   // Feed wire
@@ -1566,7 +1465,7 @@ function buildWire() {
     const feedGeo = new THREE.BufferGeometry().setFromPoints(feedPts);
     const feedMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
     feedWireLine = new THREE.Line(feedGeo, feedMat);
-    wireGroup.add(feedWireLine);
+    scene.add(feedWireLine);
   }
 
   // Step labels
@@ -1613,7 +1512,7 @@ function buildWire() {
     const lobj = new CSS2DObject(el);
     const tpos = mk.pos.clone().add(offset);
     lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
-    wireGroup.add(lobj);
+    scene.add(lobj);
     labelObjs.push(lobj);
     if (!labelsVisible) el.style.display = 'none';
   });
@@ -1639,15 +1538,15 @@ function buildWire() {
     if (autoCurlEnabled && collisionPoints.length > 0) {
       const resolved = resolveCollisionsWithCurl(transformed, wd, 5);
       // Update wire mesh with resolved points
-      if (wireMesh) { wireGroup.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+      if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
       if (resolved.length >= 2) {
         try {
-          const curve = new THREE.CatmullRomCurve3(resolved, false, 'chordal', 0.5);
+          const curve = new THREE.CatmullRomCurve3(resolved, false, 'centripetal', 0.5);
           const segs = Math.max(resolved.length * 3, 30);
-          const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
+          const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
           wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
           wireMesh.castShadow = true;
-          wireGroup.add(wireMesh);
+          scene.add(wireMesh);
         } catch(e) { console.warn('Auto-curl TubeGeometry failed', e); }
       }
       // Re-detect collisions after resolution
@@ -1999,9 +1898,9 @@ function tickSimMode(dt) {
       
       // v8: Use tube geometry for sim mode too (more realistic)
       try {
-        const curve = new THREE.CatmullRomCurve3(transformed, false, 'chordal', 0.5);
+        const curve = new THREE.CatmullRomCurve3(transformed, false, 'centripetal', 0.5);
         const segs = Math.max(transformed.length * 2, 16);
-        const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
+        const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 6, false);
         const simWireMat = (MATS[matKey] || MATS.steel).clone();
         simWireMat.emissive = new THREE.Color(0x331166);
         simWireMat.emissiveIntensity = 0.15;
@@ -2112,12 +2011,12 @@ function resolveCollisions() {
   
   if (transformedNew.length >= 2) {
     try {
-      const curve = new THREE.CatmullRomCurve3(transformedNew, false, 'chordal', 0.5);
+      const curve = new THREE.CatmullRomCurve3(transformedNew, false, 'centripetal', 0.5);
       const segs  = Math.max(transformedNew.length * 3, 30);
-      const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 12, false);
+      const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
       wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
       wireMesh.castShadow = true;
-      wireGroup.add(wireMesh);
+      scene.add(wireMesh);
     } catch (e) { console.warn('TubeGeometry failed', e); }
     
     // Feed wire
@@ -2126,7 +2025,7 @@ function resolveCollisions() {
       const feedGeo = new THREE.BufferGeometry().setFromPoints(feedPts);
       const feedMat = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
       feedWireLine = new THREE.Line(feedGeo, feedMat);
-      wireGroup.add(feedWireLine);
+      scene.add(feedWireLine);
     }
     
     // Re-check collisions
@@ -2145,7 +2044,7 @@ function resolveCollisions() {
       const lobj = new CSS2DObject(el);
       const tpos = mk.pos.clone().add(offset);
       lobj.position.copy(tpos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
-      wireGroup.add(lobj);
+      scene.add(lobj);
       labelObjs.push(lobj);
       if (!labelsVisible) el.style.display = 'none';
     });
@@ -2756,17 +2655,9 @@ document.getElementById('wdiam').addEventListener('change', buildWire);
 document.getElementById('wmat').addEventListener('change', buildWire);
 document.getElementById('bradius').addEventListener('change', buildWire);
 
-document.getElementById('lbl-show').addEventListener('click', () => {
-  labelsVisible = true;
-  document.getElementById('lbl-show').classList.add('on');
-  document.getElementById('lbl-hide').classList.remove('on');
-  labelObjs.forEach(l => { l.element.style.display = ''; });
-});
-document.getElementById('lbl-hide').addEventListener('click', () => {
-  labelsVisible = false;
-  document.getElementById('lbl-hide').classList.add('on');
-  document.getElementById('lbl-show').classList.remove('on');
-  labelObjs.forEach(l => { l.element.style.display = 'none'; });
+document.getElementById('showlabels').addEventListener('change', e => {
+  labelsVisible = e.target.value === '1';
+  labelObjs.forEach(l => { l.element.style.display = labelsVisible ? '' : 'none'; });
 });
 
 document.getElementById('axis-toggle-btn').addEventListener('click', toggleAxisGuide);
@@ -2813,27 +2704,6 @@ document.getElementById('sim-speed').addEventListener('input', e => {
   document.getElementById('sim-speed-lbl').textContent = simSpeedMult.toFixed(2).replace(/0$/, '') + 'x';
 });
 
-// Theme toggle (light/dark)
-let isLight = false;
-document.getElementById('btn-theme').addEventListener('click', () => {
-  isLight = !isLight;
-  document.documentElement.classList.toggle('light', isLight);
-  document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
-  const bgColor = isLight ? 0xf0f0f0 : 0x090909;
-  renderer.setClearColor(bgColor);
-  scene.fog = new THREE.Fog(bgColor, 400, 1000);
-  scene.background = new THREE.Color(bgColor);
-  // Rebuild grid
-  const oldGrid = scene.getObjectByName('gridHelper');
-  if (oldGrid) scene.remove(oldGrid);
-  const gridColor = isLight ? 0xcccccc : 0x1a1a1a;
-  const gridCenter = isLight ? 0x999999 : 0x333333;
-  const grid = new THREE.GridHelper(200, 40, gridCenter, gridColor);
-  grid.name = 'gridHelper';
-  grid.rotation.x = Math.PI / 2;
-  scene.add(grid);
-});
-
 // Quill rotation
 document.getElementById('quill-rot').addEventListener('input', e => {
   const deg = parseFloat(e.target.value);
@@ -2849,7 +2719,7 @@ document.getElementById('wire-rot').addEventListener('input', e => {
   const deg = parseFloat(e.target.value);
   document.getElementById('wire-rot-lbl').textContent = deg + '°';
   if (wireMesh) {
-    wireGroup.rotation.x = THREE.MathUtils.degToRad(deg);
+    wireMesh.rotation.x = THREE.MathUtils.degToRad(deg);
   }
 });
 
