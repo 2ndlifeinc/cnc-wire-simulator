@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>CNC 와이어 포밍 시뮬레이터 v6</title>
+<title>CNC 와이어 포밍 시뮬레이터 v7</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -336,7 +336,7 @@ input.si.wide{width:54px;}
       <button id="axis-toggle-btn" class="axis-on">🎯 축/슬라이드 ON</button>
       <div id="collision-banner">⚠️ 선재 관통 감지! (<span id="collision-count">0</span>개소) <button id="collision-resolve-btn">🔧 디플렉션 적용</button></div>
       <div id="sim-info">🎬 시뮬레이션 모드</div>
-      <div id="v6-badge">v6 — 물리엔진</div>
+      <div id="v6-badge">v7 — 사출방향 고정</div>
       <div id="physics-info"></div>
     </div>
   </div>
@@ -965,7 +965,7 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
   const radiusOk = minRadius >= minAllowed || !isFinite(minRadius);
   
   infoEl.innerHTML = `
-    <div>🔬 <b>물리엔진 v6</b></div>
+    <div>🔬 <b>물리엔진 v7</b></div>
     <div>최소 곡률반경: ${isFinite(minRadius) ? minRadius.toFixed(1) : '∞'} mm ${radiusOk ? '✅' : '<span class="warn">⚠️ &lt; ' + minAllowed.toFixed(1) + 'mm</span>'}</div>
     <div>충돌 감지: ${collisionEnabled ? (numCollisions > 0 ? '<span class="warn">⚠️ ' + numCollisions + '개소</span>' : '✅ 없음') : 'OFF'}</div>
     <div>벤딩 방향: <b>역방향 제약</b> 적용</div>
@@ -1029,24 +1029,43 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
           // v6: getBendDir now returns OPPOSITE of slide direction
           const bDir = getBendDir(axN, up, right);
           
-          // v6: Validate bend direction constraint
-          // cos(θ) between incoming direction and bend direction should be ≤ 0
-          const cosTheta = fwd.dot(bDir);
-          // This is naturally satisfied since bend is perpendicular to feed in YZ plane
-          
           const R = wireDiam * bendRFactor;
           const angDeg = (travel / 10) * 90 * (4.0 / wireDiam);
           const res = generateArc(pos, fwd, up, bDir, angDeg, R);
           res.pts.forEach(p => all.push(p));
           if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
-          fwd = res.newFwd; up = res.newUp;
+          
+          // ★ v7 Machine model fix: FEED direction must stay constant (nozzle direction)
+          // After generating the arc, rotate ALL existing points (including arc) around
+          // the arc endpoint (pos) by the INVERSE bend angle. This simulates the machine
+          // bending wire at the nozzle: already-extruded wire rotates, but feed direction stays fixed.
+          const absAng = Math.min(Math.abs(angDeg), 360);
+          const rad = THREE.MathUtils.degToRad(absAng);
+          const sign = angDeg >= 0 ? 1 : -1;
+          const bDirSigned = bDir.clone().multiplyScalar(sign);
+          const arcAxis = new THREE.Vector3().crossVectors(fwd, bDirSigned);
+          if (arcAxis.length() > 1e-5) {
+            arcAxis.normalize();
+            // Rotate by -rad to undo the direction change, keeping fwd constant
+            for (let p = 0; p < all.length; p++) {
+              all[p].sub(pos).applyAxisAngle(arcAxis, -rad).add(pos);
+            }
+          }
+          // fwd and up intentionally NOT updated — nozzle direction is fixed
           totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
         } else { all.push(pos.clone()); }
         break;
       }
       case 'RQ': {
         const ang = parseFloat(step.p1) || 0;
-        up.applyAxisAngle(fwd.clone().normalize(), THREE.MathUtils.degToRad(ang));
+        const angRad = THREE.MathUtils.degToRad(ang);
+        const fwdNorm = fwd.clone().normalize();
+        // ★ v7 Machine model: RQ rotates the wire around feed axis at nozzle
+        // Existing formed wire rotates around pos
+        for (let p = 0; p < all.length; p++) {
+          all[p].sub(pos).applyAxisAngle(fwdNorm, angRad).add(pos);
+        }
+        up.applyAxisAngle(fwdNorm, angRad);
         up.normalize();
         all.push(pos.clone());
         break;
@@ -1084,7 +1103,20 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
           const res = generateArc(pos, fwd, up, bDir, angDeg, R);
           res.pts.forEach(p => all.push(p));
           if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
-          fwd = res.newFwd; up = res.newUp;
+          
+          // ★ v7 Machine model fix: same as BEND — rotate existing points, keep fwd fixed
+          const absAng = Math.min(Math.abs(angDeg), 360);
+          const rad = THREE.MathUtils.degToRad(absAng);
+          const sign = angDeg >= 0 ? 1 : -1;
+          const bDirSigned = bDir.clone().multiplyScalar(sign);
+          const arcAxis = new THREE.Vector3().crossVectors(fwd, bDirSigned);
+          if (arcAxis.length() > 1e-5) {
+            arcAxis.normalize();
+            for (let p = 0; p < all.length; p++) {
+              all[p].sub(pos).applyAxisAngle(arcAxis, -rad).add(pos);
+            }
+          }
+          // fwd and up intentionally NOT updated
           totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
         } else { all.push(pos.clone()); }
         break;
