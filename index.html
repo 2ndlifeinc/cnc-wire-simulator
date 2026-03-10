@@ -619,6 +619,28 @@ function buildMachineHardware() {
   
   machineGroup.add(quillGroup);
 
+  // ── SPOOL/BARREL (사출기 통) — 뒤쪽, 앞뒤 구분용 ──
+  const barrelMat = new THREE.MeshStandardMaterial({
+    color: 0x555566, metalness: 0.6, roughness: 0.3, transparent: true, opacity: 0.4
+  });
+  const barrelGeo = new THREE.CylinderGeometry(20, 20, 40, 16);
+  const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+  barrel.rotation.z = Math.PI / 2;
+  barrel.position.x = 30;
+  machineGroup.add(barrel);
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x333344, metalness: 0.5, roughness: 0.4 });
+  const capGeo = new THREE.CircleGeometry(20, 16);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.rotation.y = -Math.PI / 2;
+  cap.position.x = 50;
+  machineGroup.add(cap);
+  const guideMat2 = new THREE.MeshStandardMaterial({ color: 0xaaaa66, metalness: 0.7, roughness: 0.2 });
+  const guideGeo2 = new THREE.CylinderGeometry(1.5, 1.5, 25, 8);
+  const guideBar = new THREE.Mesh(guideGeo2, guideMat2);
+  guideBar.rotation.z = Math.PI / 2;
+  guideBar.position.x = 20;
+  machineGroup.add(guideBar);
+
   const dieMat = new THREE.MeshStandardMaterial({ color: 0xddaa33, metalness: 0.9, roughness: 0.15 });
   const dieGeo = new THREE.CylinderGeometry(1.2, 1.2, 6, 12);
   const die = new THREE.Mesh(dieGeo, dieMat);
