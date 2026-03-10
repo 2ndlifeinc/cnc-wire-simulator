@@ -11,6 +11,26 @@
   --green:#00ff88;--gdim:#00aa55;--cyan:#00d4ff;--yellow:#ffcc00;
   --red:#ff4444;--text:#ddd;--dim:#666;--font:'Courier New',monospace;
 }
+:root.light{
+  --bg:#f5f5f5;--panel:#ffffff;--row:#f0f0f0;--border:#d0d0d0;
+  --green:#008844;--gdim:#00aa55;--cyan:#0066aa;--yellow:#aa7700;
+  --red:#cc2222;--text:#222;--dim:#777;
+}
+:root.light #hdr{background:#e8e8e8;}
+:root.light .tab{background:#f0f0f0;color:#555;}
+:root.light .tab.on{background:#008844;color:#fff;}
+:root.light .cb{background:#f0f0f0;color:#333;}
+:root.light .cb:hover{background:#ddfce8;}
+:root.light .mode-btn{background:#f0f0f0;color:#555;}
+:root.light .mode-btn.on{background:#ddfce8;color:#006633;}
+:root.light select.si,
+:root.light input.si{background:#fff;color:#222;border-color:#bbb;}
+:root.light .steprow{background:#fafafa;border-color:#ddd;}
+:root.light .steprow:hover{background:#f0faf5;}
+:root.light .slbl{background:rgba(0,136,68,.85);color:#fff;}
+:root.light #physics-info{background:#fafafa;border-color:#ddd;}
+:root.light .physics-row label{color:#555;}
+:root.light #v6-badge{background:#e0f0e8;color:#006633;}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);}
 #app{display:flex;flex-direction:column;height:100vh;}
 
@@ -338,6 +358,7 @@ input.si.wide{width:54px;}
       <input type="range" id="zoom-slider" min="10" max="500" step="5" value="140" style="width:100px;accent-color:var(--cyan);">
       <span id="zoom-lbl" style="color:var(--cyan);min-width:32px;font-size:11px;">1.0x</span>
     </div>
+    <button class="cb" id="btn-theme" title="라이트/다크 모드 전환" style="font-size:16px;padding:0 8px;">🌙</button>
   </div>
   <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
 
@@ -543,6 +564,7 @@ scene.add(pl2);
 
 // Grid
 const grid = new THREE.GridHelper(300, 60, 0x1a1a1a, 0x141414);
+grid.name = 'gridHelper';
 grid.position.y = -80;
 scene.add(grid);
 
@@ -2702,6 +2724,27 @@ document.getElementById('btn-mode-sim').addEventListener('click', () => {
 document.getElementById('sim-speed').addEventListener('input', e => {
   simSpeedMult = parseFloat(e.target.value);
   document.getElementById('sim-speed-lbl').textContent = simSpeedMult.toFixed(2).replace(/0$/, '') + 'x';
+});
+
+// Theme toggle (light/dark)
+let isLight = false;
+document.getElementById('btn-theme').addEventListener('click', () => {
+  isLight = !isLight;
+  document.documentElement.classList.toggle('light', isLight);
+  document.getElementById('btn-theme').textContent = isLight ? '☀️' : '🌙';
+  const bgColor = isLight ? 0xf0f0f0 : 0x090909;
+  renderer.setClearColor(bgColor);
+  scene.fog = new THREE.Fog(bgColor, 400, 1000);
+  scene.background = new THREE.Color(bgColor);
+  // Rebuild grid
+  const oldGrid = scene.getObjectByName('gridHelper');
+  if (oldGrid) scene.remove(oldGrid);
+  const gridColor = isLight ? 0xcccccc : 0x1a1a1a;
+  const gridCenter = isLight ? 0x999999 : 0x333333;
+  const grid = new THREE.GridHelper(200, 40, gridCenter, gridColor);
+  grid.name = 'gridHelper';
+  grid.rotation.x = Math.PI / 2;
+  scene.add(grid);
 });
 
 // Quill rotation
