@@ -787,26 +787,20 @@ function detectCollisions(points, wireDiam, markers) {
   const collisions = [];
   const threshold = wireDiam; // segments closer than wire diameter = collision
   
-  // Build step membership: which step does each segment belong to?
-  // Only skip comparisons within the SAME step (arc segments within one BEND)
-  const segStep = new Int32Array(points.length).fill(-1);
-  if (markers && markers.length > 0) {
-    markers.forEach(mk => {
-      for (let s = mk.startIdx; s <= mk.endIdx && s < points.length; s++) {
-        segStep[s] = mk.i;
-      }
-    });
+  // Pre-compute cumulative arc-length for each point
+  const arcLen = new Float64Array(points.length);
+  arcLen[0] = 0;
+  for (let i = 1; i < points.length; i++) {
+    arcLen[i] = arcLen[i - 1] + points[i].distanceTo(points[i - 1]);
   }
   
-  // Minimum gap between compared segments (physical adjacency along wire)
-  const minGap = Math.max(8, Math.ceil(points.length * 0.08));
+  // Minimum arc-length separation to consider collision (wire must be far apart ALONG the path)
+  const minArcSep = wireDiam * 6; // 6× wire diameter along the wire path
   
   for (let i = 0; i < points.length - 1; i++) {
-    for (let j = i + minGap; j < points.length - 1; j++) {
-      // Skip if both segments are in the SAME step (avoids false positives within arcs)
-      if (segStep[i] >= 0 && segStep[i] === segStep[j]) continue;
-      // Also skip if segments are in ADJACENT steps (junction between FEED→BEND)
-      if (segStep[i] >= 0 && segStep[j] >= 0 && Math.abs(segStep[i] - segStep[j]) <= 1) continue;
+    for (let j = i + 3; j < points.length - 1; j++) {
+      // Skip if arc-length between segments is too small (they're close along the wire = not collision)
+      if (arcLen[j] - arcLen[i] < minArcSep) continue;
       
       const result = segmentSegmentDistance(
         points[i], points[i + 1],
@@ -1174,9 +1168,9 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
       case 'FEED': {
         const len = Math.max(parseFloat(step.p1) || 0, 0);
         if (len > 0.01) {
-          const segs = Math.max(2, Math.ceil(len / 2));
-          for (let k = 1; k <= segs; k++)
-            all.push(pos.clone().addScaledVector(fwd, (k / segs) * len));
+          // v9: FEED = straight line. Only start + end point needed.
+          // Intermediate points cause TubeGeometry cross-section artifacts.
+          all.push(pos.clone().addScaledVector(fwd, len));
           pos = all[all.length - 1].clone();
           totalLen += len;
         } else { all.push(pos.clone()); }
@@ -1193,7 +1187,8 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
           const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
           const bDir = getBendDir(axN, up, right);
           
-          const R = wireDiam * bendRFactor;
+          // v9: Enforce minimum bend radius at source (not post-processing)
+          const R = Math.max(wireDiam * bendRFactor, wireDiam * minCurvatureMultiplier);
           const angDeg = hasAngle ? directAngle : (travel / 10) * 90 * (4.0 / wireDiam);
           const res = generateArc(pos, fwd, up, bDir, angDeg, R);
           res.pts.forEach(p => all.push(p));
@@ -1280,8 +1275,9 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
     markers.push({ i, type: step.type, axis: step.axis, startIdx, endIdx, pos: all[midIdx].clone() });
   });
 
-  // v6: Apply minimum curvature radius enforcement
-  const enforcedPoints = enforceMinCurvature(all, wireDiam, minCurvatureMultiplier);
+  // v9: Skip enforceMinCurvature — it distorts arc points and causes wobble.
+  // Minimum curvature is now enforced at generateArc level (bend radius floor).
+  const enforcedPoints = all;
 
   const box = new THREE.Box3().setFromPoints(enforcedPoints);
   const sz  = new THREE.Vector3(); box.getSize(sz);
