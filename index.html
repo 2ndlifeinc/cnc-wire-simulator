@@ -242,10 +242,61 @@ input.si.wide{width:54px;}
 
 /* Responsive */
 @media(max-width:750px){
-  #main{flex-direction:column;}
-  #lp{width:100%;height:47vh;border-right:none;border-bottom:2px solid var(--border);}
-  #rp{height:53vh;}
+  #main{flex-direction:column-reverse;}
+  #lp{width:100%;max-height:40vh;border-right:none;border-top:2px solid var(--border);overflow-y:auto;}
+  #rp{flex:1;min-height:45vh;}
+  
+  /* Header: compact */
+  #hdr{padding:4px 6px;gap:3px;}
+  .tabs{display:none;} /* hide machine tabs on mobile - not enough space */
+  .tab{padding:0 8px;font-size:10px;min-height:36px;}
+  .cb{padding:0 8px;font-size:11px;min-height:40px;}
+  .mode-btn{padding:0 6px;font-size:10px;min-height:40px;}
+  #stepind{font-size:10px;min-width:70px;}
+  
+  /* Left panel sections */
+  .sec{padding:6px 8px;}
+  .sectitle{font-size:9px;margin-bottom:4px;}
+  .wsettings{gap:4px;}
+  .wsettings label{font-size:10px;}
+  
+  /* Step editor rows */
+  .steprow{padding:4px 6px;gap:3px;flex-wrap:wrap;}
+  .stepnum{font-size:10px;min-width:18px;}
+  select.si,input.si{font-size:11px;min-height:32px;}
+  select.si{min-width:50px;}
+  input.si{width:40px;}
+  .slabel{font-size:9px;}
+  .sdel{min-width:28px;min-height:28px;font-size:14px;}
+  
+  /* Presets */
+  .presets button{font-size:10px;padding:4px 8px;min-height:32px;}
+  
+  /* Zoom slider */
+  #zoom-slider{width:70px !important;}
+  
+  /* Speed wrap */
+  .speed-wrap{font-size:9px;}
+  .speed-wrap input[type=range]{width:50px;}
+  
+  /* Physics panel */
+  #physics-info{font-size:10px;padding:4px 8px;}
+  
+  /* Floating toggle for editor */
+  #mobile-toggle{display:flex !important;}
 }
+
+/* Mobile editor toggle button */
+#mobile-toggle{
+  display:none;
+  position:fixed;bottom:10px;right:10px;z-index:100;
+  background:var(--green);color:#000;border:none;
+  width:50px;height:50px;border-radius:50%;
+  font-size:20px;cursor:pointer;
+  align-items:center;justify-content:center;
+  box-shadow:0 4px 12px rgba(0,255,136,0.4);
+}
+#mobile-toggle:active{transform:scale(0.9);}
 </style>
 </head>
 <body>
@@ -340,6 +391,7 @@ input.si.wide{width:54px;}
       </div>
       <div id="se">
         <div id="sim-blocked">🚫 물리적으로 불가능한 시퀀스 — 수정 필요</div>
+        <button id="mobile-toggle" title="에디터 토글">📝</button>
         <div id="steplist"></div>
         <button class="addbtn" id="addstepbtn">+ 스텝 추가 (CUT 위에 삽입)</button>
       </div>
@@ -2601,12 +2653,28 @@ document.getElementById('sim-speed').addEventListener('input', e => {
   document.getElementById('sim-speed-lbl').textContent = simSpeedMult.toFixed(2).replace(/0$/, '') + 'x';
 });
 
+// Mobile editor toggle
+document.getElementById('mobile-toggle').addEventListener('click', () => {
+  const lp = document.getElementById('lp');
+  const btn = document.getElementById('mobile-toggle');
+  if (lp.style.display === 'none') {
+    lp.style.display = 'flex';
+    btn.textContent = '🎬';
+    btn.title = '3D 뷰 확대';
+  } else {
+    lp.style.display = 'none';
+    btn.textContent = '📝';
+    btn.title = '에디터 열기';
+  }
+  onResize();
+});
+
 // ══════════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════════
 buildMachineHardware();
 buildPresetBtns();
-loadPreset('uhook');
+loadPreset('lhook'); // Simple L-hook as default (clean on first load)
 onResize();
 render();
 
