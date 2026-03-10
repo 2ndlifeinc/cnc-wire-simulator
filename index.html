@@ -2013,104 +2013,97 @@ function selectMachine(n) {
 const PRESETS = {
   uhook: {
     label:'U훅', m:1,
+    // U자 형태: 아래로 180° 벤드 (travel 10=90°, 두 번 = 180°, FEED 간격 충분)
     steps:[
-      {type:'FEED',p1:'20',speed:'80'},
-      {type:'BEND',axis:'1',p1:'14',speed:'65'},
-      {type:'FEED',p1:'5',speed:'80'},
-      {type:'BEND',axis:'1',p1:'14',speed:'65'},
-      {type:'FEED',p1:'5',speed:'80'},
+      {type:'FEED',p1:'25',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'25',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
   sclip: {
     label:'S클립', m:1,
+    // S자: X1(아래)→X5(위) 반대 방향 벤드
     steps:[
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
       {type:'FEED',p1:'15',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'65'},
-      {type:'FEED',p1:'10',speed:'80'},
-      {type:'BEND',axis:'5',p1:'11',speed:'65'},
-      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'5',p1:'10',speed:'65'},
+      {type:'FEED',p1:'20',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
   square: {
     label:'사각 프레임', m:1,
+    // 사각형: 90° 벤드 4회 + RQ로 벤드 평면 유지
     steps:[
       {type:'FEED',p1:'30',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
       {type:'FEED',p1:'20',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'RQ',p1:'90',speed:'100'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
       {type:'FEED',p1:'30',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'RQ',p1:'90',speed:'100'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
       {type:'FEED',p1:'20',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
   clip3d: {
     label:'3D 클립', m:1,
+    // 3D: RQ로 벤딩 평면 전환
     steps:[
-      {type:'FEED',p1:'12',speed:'80'},
-      {type:'BEND',axis:'1',p1:'10',speed:'65'},
-      {type:'FEED',p1:'10',speed:'80'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'8',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
       {type:'RQ',p1:'90',speed:'100'},
-      {type:'BEND',axis:'1',p1:'10',speed:'65'},
-      {type:'FEED',p1:'12',speed:'80'},
+      {type:'BEND',axis:'1',p1:'8',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
   coil5: {
     label:'코일 5권', m:1,
     steps:[
-      {type:'FEED',p1:'8',speed:'80'},
+      {type:'FEED',p1:'10',speed:'80'},
       {type:'SM',p1:'5',p2:'12',speed:'60'},
-      {type:'FEED',p1:'8',speed:'80'},
+      {type:'FEED',p1:'10',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
-  diggle: {
-    label:'Diggle형 4mm', m:1,
+  lhook: {
+    label:'L훅', m:1,
+    // 간단한 90° 꺾임
     steps:[
-      {type:'FEED',p1:'8',speed:'80'},
-      {type:'BEND',axis:'1',p1:'9',speed:'65'},
-      {type:'FEED',p1:'6',speed:'80'},
-      {type:'BEND',axis:'3',p1:'10',speed:'65'},
-      {type:'RQ',p1:'45',speed:'100'},
-      {type:'FEED',p1:'12',speed:'80'},
-      {type:'BEND',axis:'5',p1:'9',speed:'65'},
-      {type:'FEED',p1:'6',speed:'80'},
-      {type:'BEND',axis:'7',p1:'10',speed:'65'},
-      {type:'RQ',p1:'-45',speed:'100'},
-      {type:'FEED',p1:'8',speed:'80'},
+      {type:'FEED',p1:'30',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  zhook: {
+    label:'Z형 클립', m:1,
+    // Z자: 같은 축 같은 방향 2회 벤드 (계단)
+    steps:[
+      {type:'FEED',p1:'25',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'25',speed:'80'},
       {type:'CUT',speed:'100'},
     ]
   },
   spring_torsion: {
     label:'비틀림 스프링', m:1,
     steps:[
-      {type:'FEED',p1:'15',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'60'},
-      {type:'SM',p1:'6',p2:'10',speed:'55'},
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'BEND',axis:'1',p1:'8',speed:'60'},
+      {type:'SM',p1:'5',p2:'12',speed:'55'},
       {type:'RQ',p1:'180',speed:'100'},
-      {type:'FEED',p1:'15',speed:'80'},
-      {type:'BEND',axis:'1',p1:'11',speed:'60'},
-      {type:'CUT',speed:'100'},
-    ]
-  },
-  // v6: collision test preset
-  tight_coil: {
-    label:'타이트 코일 (충돌테스트)', m:1,
-    steps:[
-      {type:'FEED',p1:'5',speed:'80'},
-      {type:'BEND',axis:'1',p1:'18',speed:'60'},
-      {type:'FEED',p1:'3',speed:'80'},
-      {type:'BEND',axis:'3',p1:'18',speed:'60'},
-      {type:'FEED',p1:'3',speed:'80'},
-      {type:'BEND',axis:'5',p1:'18',speed:'60'},
-      {type:'FEED',p1:'3',speed:'80'},
-      {type:'BEND',axis:'7',p1:'18',speed:'60'},
-      {type:'FEED',p1:'3',speed:'80'},
-      {type:'BEND',axis:'1',p1:'18',speed:'60'},
-      {type:'FEED',p1:'5',speed:'80'},
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'BEND',axis:'1',p1:'8',speed:'60'},
       {type:'CUT',speed:'100'},
     ]
   },
@@ -2183,7 +2176,8 @@ const SHAPE_PATTERNS = [
   { keywords: ['비틀림','토션','torsion','torsional'], preset: 'spring_torsion', label: '비틀림 스프링' },
   { keywords: ['지그재그','zigzag','지그','zig'], preset: 'cam_zigzag', label: 'CAM 지그재그' },
   { keywords: ['cam','캠'], preset: 'cam_simple', label: 'CAM 단순 벤드' },
-  { keywords: ['타이트','tight','충돌'], preset: 'tight_coil', label: '타이트 코일' },
+  { keywords: ['l자','l훅','lhook','엘자','엘훅'], preset: 'lhook', label: 'L훅' },
+  { keywords: ['z자','z클립','z형','지그재그','계단'], preset: 'zhook', label: 'Z형 클립' },
 ];
 
 function matchShape(desc) {
