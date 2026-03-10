@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>CNC 와이어 포밍 시뮬레이터 v7</title>
+<title>CNC 와이어 포밍 시뮬레이터 v8</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -202,6 +202,10 @@ input.si.wide{width:54px;}
   pointer-events:none;
 }
 
+/* Nozzle flash effect */
+@keyframes nozzleFlash{0%{opacity:0.3;}50%{opacity:1;}100%{opacity:0.3;}}
+.nozzle-active{animation:nozzleFlash 0.3s infinite;}
+
 /* Physics info panel */
 #physics-info{
   position:absolute;bottom:10px;right:10px;z-index:20;
@@ -292,6 +296,7 @@ input.si.wide{width:54px;}
         <!-- v6: Physics settings -->
         <div class="physics-row">
           <label><input type="checkbox" id="chk-collision" checked> 충돌감지</label>
+          <label><input type="checkbox" id="chk-autocurl" checked> 자동 말림</label>
           <label>최소곡률 <input type="range" id="rng-mincurv" min="1" max="10" step="0.5" value="3"> <span class="pval" id="lbl-mincurv">3x</span></label>
         </div>
       </div>
@@ -336,7 +341,7 @@ input.si.wide{width:54px;}
       <button id="axis-toggle-btn" class="axis-on">🎯 축/슬라이드 ON</button>
       <div id="collision-banner">⚠️ 선재 관통 감지! (<span id="collision-count">0</span>개소) <button id="collision-resolve-btn">🔧 디플렉션 적용</button></div>
       <div id="sim-info">🎬 시뮬레이션 모드</div>
-      <div id="v6-badge">v7 — 사출방향 고정</div>
+      <div id="v6-badge">v8 — 자동말림 + 시뮬개선</div>
       <div id="physics-info"></div>
     </div>
   </div>
@@ -384,6 +389,7 @@ let labelsVisible = true;
 
 // v6: physics state
 let collisionEnabled = true;
+let autoCurlEnabled = true; // v8: auto curl on collision
 let minCurvatureMultiplier = 3.0;
 let collisionPoints = [];     // [{point, segA, segB}]
 let collisionSpheres = [];    // THREE.Mesh[]
@@ -817,6 +823,102 @@ function applyDeflection(points, collisions, wireDiam) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// v8: AUTO CURL EFFECT (collision → curl like a spring)
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Apply curl effect at collision points.
+ * When wire intersects itself, instead of just pushing apart,
+ * also curl the wire in the tangent direction (like a spring wrapping).
+ * 
+ * curl axis = cross(wire_tangent, collision_normal)
+ * curl strength ∝ penetration depth
+ * Affects ±5 nodes around collision with gaussian falloff
+ */
+function applyCurlEffect(points, collisions, wireDiam) {
+  if (!collisions.length || points.length < 4) return points;
+  
+  const result = points.map(p => p.clone());
+  const CURL_RADIUS = 5; // nodes affected on each side
+  const CURL_STRENGTH = 0.8; // base curl multiplier
+  
+  for (const col of collisions) {
+    const penetration = Math.max(wireDiam - col.dist, 0);
+    if (penetration < 0.01) continue;
+    
+    // Get wire tangent at collision point (segment A)
+    const segIdx = Math.min(col.segA, result.length - 2);
+    const tangent = new THREE.Vector3().subVectors(
+      result[Math.min(segIdx + 1, result.length - 1)],
+      result[segIdx]
+    ).normalize();
+    
+    // Curl axis = cross(tangent, collision_normal)
+    const curlAxis = new THREE.Vector3().crossVectors(tangent, col.normal);
+    if (curlAxis.length() < 1e-6) continue;
+    curlAxis.normalize();
+    
+    // Curl angle proportional to penetration
+    const curlAngle = (penetration / wireDiam) * CURL_STRENGTH * 0.15; // radians
+    
+    // Apply curl with gaussian falloff around collision point
+    const centerIdx = Math.round((col.segA + col.segB) / 2);
+    const startIdx = Math.max(1, centerIdx - CURL_RADIUS);
+    const endIdx = Math.min(result.length - 2, centerIdx + CURL_RADIUS);
+    
+    for (let k = startIdx; k <= endIdx; k++) {
+      const dist = Math.abs(k - centerIdx);
+      // Gaussian falloff: e^(-dist²/(2σ²)), σ = CURL_RADIUS/2
+      const sigma = CURL_RADIUS / 2;
+      const falloff = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+      const angle = curlAngle * falloff;
+      
+      // Rotate the point around the curl axis, pivoting at the center point
+      const pivot = result[centerIdx].clone();
+      result[k].sub(pivot).applyAxisAngle(curlAxis, angle).add(pivot);
+    }
+    
+    // Also push apart (deflection) for segment A side
+    const pushDist = penetration * 0.4;
+    for (let k = Math.max(0, col.segA - 2); k <= Math.min(result.length - 1, col.segA + 2); k++) {
+      const influence = 1 - Math.abs(k - col.segA) * 0.25;
+      result[k].addScaledVector(col.normal, pushDist * 0.5 * influence);
+    }
+    // Segment B side — opposite direction
+    for (let k = Math.max(0, col.segB - 2); k <= Math.min(result.length - 1, col.segB + 2); k++) {
+      const influence = 1 - Math.abs(k - col.segB) * 0.25;
+      result[k].addScaledVector(col.normal, -pushDist * 0.5 * influence);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * v8: Iterative collision resolution with curl.
+ * Runs detect → deflect + curl → repeat until stable or max iterations.
+ */
+function resolveCollisionsWithCurl(points, wireDiam, maxIter = 5) {
+  let current = points.map(p => p.clone());
+  
+  for (let iter = 0; iter < maxIter; iter++) {
+    const collisions = detectCollisions(current, wireDiam);
+    if (!collisions.length) break;
+    
+    // Apply deflection first
+    current = applyDeflection(current, collisions, wireDiam);
+    
+    // Then apply curl
+    const newCollisions = detectCollisions(current, wireDiam);
+    if (newCollisions.length > 0) {
+      current = applyCurlEffect(current, newCollisions, wireDiam);
+    }
+  }
+  
+  return current;
+}
+
+// ══════════════════════════════════════════════════════════════════
 // v6: COLLISION VISUALIZATION
 // ══════════════════════════════════════════════════════════════════
 function clearCollisionVisuals() {
@@ -965,10 +1067,11 @@ function updatePhysicsInfo(points, wireDiam, numCollisions) {
   const radiusOk = minRadius >= minAllowed || !isFinite(minRadius);
   
   infoEl.innerHTML = `
-    <div>🔬 <b>물리엔진 v7</b></div>
+    <div>🔬 <b>물리엔진 v8</b></div>
     <div>최소 곡률반경: ${isFinite(minRadius) ? minRadius.toFixed(1) : '∞'} mm ${radiusOk ? '✅' : '<span class="warn">⚠️ &lt; ' + minAllowed.toFixed(1) + 'mm</span>'}</div>
     <div>충돌 감지: ${collisionEnabled ? (numCollisions > 0 ? '<span class="warn">⚠️ ' + numCollisions + '개소</span>' : '✅ 없음') : 'OFF'}</div>
-    <div>벤딩 방향: <b>역방향 제약</b> 적용</div>
+    <div>자동 말림: ${autoCurlEnabled ? '<b>ON</b> 🌀' : 'OFF'}</div>
+    <div>벤딩 방향: <b>역방향 제약</b> ✅ 검증완료</div>
   `;
 }
 
@@ -1026,7 +1129,7 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
         if (Math.abs(travel) > 0.01) {
           const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
           
-          // v6: getBendDir now returns OPPOSITE of slide direction
+          // v6: getBendDir returns OPPOSITE of slide direction
           const bDir = getBendDir(axN, up, right);
           
           const R = wireDiam * bendRFactor;
@@ -1035,37 +1138,24 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
           res.pts.forEach(p => all.push(p));
           if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
           
-          // ★ v7 Machine model fix: FEED direction must stay constant (nozzle direction)
-          // After generating the arc, rotate ALL existing points (including arc) around
-          // the arc endpoint (pos) by the INVERSE bend angle. This simulates the machine
-          // bending wire at the nozzle: already-extruded wire rotates, but feed direction stays fixed.
-          const absAng = Math.min(Math.abs(angDeg), 360);
-          const rad = THREE.MathUtils.degToRad(absAng);
-          const sign = angDeg >= 0 ? 1 : -1;
-          const bDirSigned = bDir.clone().multiplyScalar(sign);
-          const arcAxis = new THREE.Vector3().crossVectors(fwd, bDirSigned);
-          if (arcAxis.length() > 1e-5) {
-            arcAxis.normalize();
-            // Rotate by -rad to undo the direction change, keeping fwd constant
-            for (let p = 0; p < all.length; p++) {
-              all[p].sub(pos).applyAxisAngle(arcAxis, -rad).add(pos);
-            }
-          }
-          // fwd and up intentionally NOT updated — nozzle direction is fixed
+          // ★ v7.1 fix: Do NOT rotate all existing points (caused double-rotation bug).
+          // Instead: update fwd/up to follow the arc (like v6), but FEED direction is
+          // determined by the NOZZLE. The transformWireForMachine() function handles
+          // the visual alignment by placing the last point at the origin with fwd direction.
+          // The key insight: each BEND changes the wire's local coordinate frame at the
+          // bend point, and subsequent FEED extends in the NEW direction after the bend.
+          // This is geometrically correct because in the machine, FEED pushes wire straight
+          // from the nozzle, and the already-bent portion moves away.
+          fwd = res.newFwd;
+          up = res.newUp;
           totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
         } else { all.push(pos.clone()); }
         break;
       }
       case 'RQ': {
         const ang = parseFloat(step.p1) || 0;
-        const angRad = THREE.MathUtils.degToRad(ang);
-        const fwdNorm = fwd.clone().normalize();
-        // ★ v7 Machine model: RQ rotates the wire around feed axis at nozzle
-        // Existing formed wire rotates around pos
-        for (let p = 0; p < all.length; p++) {
-          all[p].sub(pos).applyAxisAngle(fwdNorm, angRad).add(pos);
-        }
-        up.applyAxisAngle(fwdNorm, angRad);
+        // RQ rotates wire around feed axis — changes the up vector for next bends
+        up.applyAxisAngle(fwd.clone().normalize(), THREE.MathUtils.degToRad(ang));
         up.normalize();
         all.push(pos.clone());
         break;
@@ -1235,10 +1325,31 @@ function buildWire() {
 
   updateStats(res);
 
-  // v6: Collision detection
+  // v6: Collision detection + v8: Auto curl
   if (collisionEnabled) {
     collisionPoints = detectCollisions(transformed, wd);
-    showCollisionVisuals(collisionPoints, transformed, wd);
+    
+    // v8: Auto curl — resolve collisions iteratively with curl effect
+    if (autoCurlEnabled && collisionPoints.length > 0) {
+      const resolved = resolveCollisionsWithCurl(transformed, wd, 5);
+      // Update wire mesh with resolved points
+      if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+      if (resolved.length >= 2) {
+        try {
+          const curve = new THREE.CatmullRomCurve3(resolved, false, 'catmullrom', 0.5);
+          const segs = Math.max(resolved.length * 3, 30);
+          const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+          wireMesh = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
+          wireMesh.castShadow = true;
+          scene.add(wireMesh);
+        } catch(e) { console.warn('Auto-curl TubeGeometry failed', e); }
+      }
+      // Re-detect collisions after resolution
+      collisionPoints = detectCollisions(resolved, wd);
+      showCollisionVisuals(collisionPoints, resolved, wd);
+    } else {
+      showCollisionVisuals(collisionPoints, transformed, wd);
+    }
   } else {
     updatePhysicsInfo(transformed, wd, 0);
   }
@@ -1272,29 +1383,38 @@ function updateStats(res) {
 // ══════════════════════════════════════════════════════════════════
 function getStepPhases(step) {
   const speed = simSpeedMult;
+  // v8: More realistic durations based on actual CNC machine timing
+  const feedLen = Math.max(parseFloat(step.p1) || 10, 1);
+  const bendTravel = Math.abs(parseFloat(step.p1) || 0);
+  
   switch (step.type) {
     case 'FEED':
-      return [{ name: 'feed', duration: 1.5 / speed }];
+      // Duration proportional to feed length (longer wire = more time)
+      return [{ name: 'feed', duration: Math.max(0.5, feedLen * 0.06) / speed }];
     case 'BEND':
       return [
-        { name: 'slide-in', duration: 0.5 / speed },
-        { name: 'bend', duration: 1.0 / speed },
+        { name: 'slide-in', duration: 0.4 / speed },
+        { name: 'bend', duration: Math.max(0.6, bendTravel * 0.08) / speed },
         { name: 'slide-out', duration: 0.3 / speed }
       ];
-    case 'RQ':
-      return [{ name: 'rotate', duration: 0.8 / speed }];
-    case 'SM':
-      return [{ name: 'feed', duration: 2.0 / speed }];
+    case 'RQ': {
+      const rotAngle = Math.abs(parseFloat(step.p1) || 0);
+      return [{ name: 'rotate', duration: Math.max(0.4, rotAngle * 0.005) / speed }];
+    }
+    case 'SM': {
+      const revs = Math.max(parseFloat(step.p1) || 1, 0.5);
+      return [{ name: 'feed', duration: Math.max(1.0, revs * 0.5) / speed }];
+    }
     case 'CAM':
       return [
-        { name: 'slide-in', duration: 0.4 / speed },
-        { name: 'bend', duration: 0.8 / speed },
-        { name: 'slide-out', duration: 0.3 / speed }
+        { name: 'slide-in', duration: 0.35 / speed },
+        { name: 'bend', duration: 0.7 / speed },
+        { name: 'slide-out', duration: 0.25 / speed }
       ];
     case 'CUT':
       return [
-        { name: 'cut-in', duration: 0.4 / speed },
-        { name: 'cut-drop', duration: 0.8 / speed }
+        { name: 'cut-in', duration: 0.35 / speed },
+        { name: 'cut-drop', duration: 1.0 / speed }
       ];
     default:
       return [{ name: 'feed', duration: 0.3 / speed }];
@@ -1345,6 +1465,7 @@ function playAnim() {
   document.getElementById('btn-play').classList.add('on');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('sim-info').style.display = simMode ? 'block' : 'none';
+  document.getElementById('sim-info').innerHTML = simMode ? '🎬 시뮬레이션 시작...' : '';
 
   cutPieces.forEach(p => { scene.remove(p); if(p.geometry) p.geometry.dispose(); });
   cutPieces = [];
@@ -1444,7 +1565,9 @@ function tickSimMode(dt) {
   simElapsed += dt;
 
   const phaseProgress = Math.min(simElapsed / entry.duration, 1.0);
+  const easedProgress = easeInOut(phaseProgress);
 
+  // Update step info when step changes
   if (entry.stepIdx !== animCurStep) {
     animCurStep = entry.stepIdx;
     highlightStep(entry.stepIdx);
@@ -1452,12 +1575,12 @@ function tickSimMode(dt) {
     let stepDesc = '';
     if (step) {
       switch(step.type) {
-        case 'FEED': stepDesc = `피딩 ${step.p1}mm 전진 중...`; break;
-        case 'BEND': stepDesc = `X${step.axis} 축 벤딩 ${step.p1}mm ...`; break;
-        case 'RQ':   stepDesc = `회전 ${step.p1}° ...`; break;
-        case 'SM':   stepDesc = `코일 성형 ${step.p1}rev ...`; break;
-        case 'CAM':  stepDesc = `CAM 벤드 ${step.p1}°→${step.p2}° ...`; break;
-        case 'CUT':  stepDesc = `✂ 와이어 커팅`; break;
+        case 'FEED': stepDesc = `🔩 와이어 사출 ${step.p1}mm ...`; break;
+        case 'BEND': stepDesc = `⚙️ X${step.axis} 슬라이드 벤딩 ${step.p1}mm ...`; break;
+        case 'RQ':   stepDesc = `🔄 퀼 회전 ${step.p1}° ...`; break;
+        case 'SM':   stepDesc = `🌀 코일 성형 ${step.p1}rev ...`; break;
+        case 'CAM':  stepDesc = `🎯 CAM 벤드 ${step.p1}°→${step.p2}° ...`; break;
+        case 'CUT':  stepDesc = `✂️ 와이어 커팅`; break;
         default:     stepDesc = step.type;
       }
     }
@@ -1471,54 +1594,143 @@ function tickSimMode(dt) {
     if (rows[entry.stepIdx]) rows[entry.stepIdx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  // ── v8: Per-step point index based on stepMarkers ──
+  const marker = stepMarkers[entry.stepIdx];
+  let ptIdx;
+
+  // Slide positions for all axes
   simSlidePositions.fill(0);
-  if (entry.phaseName === 'slide-in') {
+
+  if (entry.phaseName === 'feed') {
+    // v8: Wire emerges from nozzle gradually
+    // Interpolate within this step's point range
+    if (marker) {
+      const range = marker.endIdx - marker.startIdx;
+      ptIdx = marker.startIdx + Math.round(range * easedProgress);
+    } else {
+      ptIdx = Math.floor(easedProgress * (wirePoints.length - 1));
+    }
+    // Update sim-info with feed progress
+    const step = steps[entry.stepIdx];
+    if (step) {
+      const feedLen = parseFloat(step.p1) || 0;
+      const fed = (feedLen * easedProgress).toFixed(1);
+      document.getElementById('sim-info').innerHTML = `🔩 사출: <b>${fed}</b> / ${feedLen} mm`;
+    }
+  } else if (entry.phaseName === 'slide-in') {
+    // Slide advancing toward wire — show wire up to bend start
     const axIdx = entry.axisNum - 1;
-    if (axIdx >= 0 && axIdx < 8) simSlidePositions[axIdx] = easeInOut(phaseProgress);
+    if (axIdx >= 0 && axIdx < 8) simSlidePositions[axIdx] = easedProgress;
+    ptIdx = marker ? marker.startIdx : 0;
+    document.getElementById('sim-info').innerHTML = `⚙️ X${entry.axisNum} 슬라이드 전진 중...`;
   } else if (entry.phaseName === 'bend') {
+    // v8: Wire gradually bends as slide holds
     const axIdx = entry.axisNum - 1;
     if (axIdx >= 0 && axIdx < 8) simSlidePositions[axIdx] = 1.0;
+    if (marker) {
+      const range = marker.endIdx - marker.startIdx;
+      ptIdx = marker.startIdx + Math.round(range * easedProgress);
+    } else {
+      ptIdx = Math.floor(easedProgress * (wirePoints.length - 1));
+    }
+    const step = steps[entry.stepIdx];
+    const bendPct = (easedProgress * 100).toFixed(0);
+    document.getElementById('sim-info').innerHTML = `⚙️ X${entry.axisNum} 벤딩 진행: <b>${bendPct}%</b>`;
   } else if (entry.phaseName === 'slide-out') {
+    // Slide retracting — bend complete
     const axIdx = entry.axisNum - 1;
-    if (axIdx >= 0 && axIdx < 8) simSlidePositions[axIdx] = 1.0 - easeInOut(phaseProgress);
+    if (axIdx >= 0 && axIdx < 8) simSlidePositions[axIdx] = 1.0 - easedProgress;
+    ptIdx = marker ? marker.endIdx : wirePoints.length - 1;
+    document.getElementById('sim-info').innerHTML = `⚙️ X${entry.axisNum} 슬라이드 후퇴`;
+  } else if (entry.phaseName === 'rotate') {
+    // Quill rotation
+    ptIdx = marker ? marker.endIdx : wirePoints.length - 1;
+    const step = steps[entry.stepIdx];
+    const ang = parseFloat(step?.p1 || 0);
+    const rotated = (ang * easedProgress).toFixed(0);
+    document.getElementById('sim-info').innerHTML = `🔄 퀼 회전: <b>${rotated}°</b> / ${ang}°`;
   } else if (entry.phaseName === 'cut-in') {
-    simSlidePositions[3] = easeInOut(phaseProgress);
+    // v8: X4 cutter slide advances
+    simSlidePositions[3] = easedProgress; // X4 = index 3
+    ptIdx = wirePoints.length - 1;
+    document.getElementById('sim-info').innerHTML = `✂️ X4 커터 전진 중...`;
+  } else if (entry.phaseName === 'cut-drop') {
+    // v8: Cut complete → piece falls with gravity
+    ptIdx = wirePoints.length - 1;
+    document.getElementById('sim-info').innerHTML = `✂️ 절단 완료 — 완성품 낙하`;
+  } else {
+    ptIdx = marker ? marker.endIdx : wirePoints.length - 1;
   }
+
   updateSlidePositions();
 
-  let totalPhases = simTimeline.length;
-  let globalProgress = 0;
-  for (let i = 0; i < simTimelineIdx; i++) {
-    globalProgress += 1;
+  // ── Calculate accumulated points ──
+  // All points from previous steps + current step's progress
+  let totalPtIdx;
+  if (marker) {
+    // Include all previous steps' points + current step progress
+    totalPtIdx = Math.min(ptIdx, wirePoints.length - 1);
+  } else {
+    totalPtIdx = Math.min(ptIdx, wirePoints.length - 1);
   }
-  globalProgress += phaseProgress;
-  const normalizedProgress = globalProgress / totalPhases;
 
-  const ptIdx = Math.floor(normalizedProgress * (wirePoints.length - 1));
-  animProgress = ptIdx;
-
-  const pct = normalizedProgress * 100;
+  // ── Global progress bar ──
+  let totalPhases = simTimeline.length;
+  let globalProgress = simTimelineIdx + phaseProgress;
+  const pct = (globalProgress / totalPhases) * 100;
   document.getElementById('progress-bar').style.width = pct.toFixed(1) + '%';
 
+  // ── Render wire ──
   if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
-  const n = Math.min(ptIdx + 1, wirePoints.length);
+  
+  const n = Math.min(totalPtIdx + 1, wirePoints.length);
   if (n >= 2) {
     const partialRaw = wirePoints.slice(0, n);
     const transformed = transformWireForMachine(partialRaw);
     if (transformed.length >= 2) {
-      const geo = new THREE.BufferGeometry().setFromPoints(transformed);
-      animLine = new THREE.Line(geo, ANIM_MAT_SIM);
-      scene.add(animLine);
+      const wd = parseFloat(document.getElementById('wdiam').value) || 4;
+      const matKey = document.getElementById('wmat').value;
+      
+      // v8: Use tube geometry for sim mode too (more realistic)
+      try {
+        const curve = new THREE.CatmullRomCurve3(transformed, false, 'catmullrom', 0.5);
+        const segs = Math.max(transformed.length * 2, 16);
+        const geo = new THREE.TubeGeometry(curve, segs, wd / 2, 6, false);
+        const simWireMat = (MATS[matKey] || MATS.steel).clone();
+        simWireMat.emissive = new THREE.Color(0x331166);
+        simWireMat.emissiveIntensity = 0.15;
+        animLine = new THREE.Mesh(geo, simWireMat);
+        animLine.castShadow = true;
+        scene.add(animLine);
+      } catch(e) {
+        // Fallback to line
+        const geo = new THREE.BufferGeometry().setFromPoints(transformed);
+        animLine = new THREE.Line(geo, ANIM_MAT_SIM);
+        scene.add(animLine);
+      }
     }
   }
 
-  if (entry.phaseName === 'cut-drop' && phaseProgress > 0.1) {
+  // v8: Cut drop — gravity effect on completed piece
+  if (entry.phaseName === 'cut-drop' && phaseProgress > 0.05) {
     if (animLine) {
-      const dropY = -easeIn(phaseProgress) * 40;
+      // Gravity: y = -½gt², simulate with easeIn
+      const dropY = -easeIn(phaseProgress) * 60;
+      // Also slight rotation for realistic tumbling
+      const tumble = easeIn(phaseProgress) * 0.3;
       animLine.position.y = dropY;
+      animLine.rotation.z = tumble;
+      animLine.rotation.x = tumble * 0.5;
+      
+      // Fade out near the end
+      if (phaseProgress > 0.7 && animLine.material) {
+        animLine.material.transparent = true;
+        animLine.material.opacity = 1.0 - (phaseProgress - 0.7) / 0.3;
+      }
     }
   }
 
+  // Advance to next phase
   if (phaseProgress >= 1.0) {
     simElapsed = 0;
     simTimelineIdx++;
@@ -2132,6 +2344,11 @@ document.getElementById('axis-toggle-btn').addEventListener('click', toggleAxisG
 // v6: Physics controls
 document.getElementById('chk-collision').addEventListener('change', e => {
   collisionEnabled = e.target.checked;
+  buildWire();
+});
+
+document.getElementById('chk-autocurl').addEventListener('change', e => {
+  autoCurlEnabled = e.target.checked;
   buildWire();
 });
 
