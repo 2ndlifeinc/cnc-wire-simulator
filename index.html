@@ -119,6 +119,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .steprow.done{border-left-color:var(--gdim);background:#0c1a10;}
 .steprow.cut-row{border-left-color:#ff4444;background:#1a0808;}
 .steprow.collision{border-left-color:#ff0000;background:#2a0000;box-shadow:0 0 8px rgba(255,0,0,0.3);animation:collisionPulse 1s infinite;}
+.steprow.eng-warn{border-left-color:#ff6600;background:#2a1500;}
+.steprow .eng-msg{display:block;font-size:10px;color:#ff6600;margin-top:2px;padding-left:24px;}
 @keyframes collisionPulse{0%,100%{box-shadow:0 0 8px rgba(255,0,0,0.3);}50%{box-shadow:0 0 15px rgba(255,0,0,0.6);}}
 .stepnum{color:var(--dim);font-size:11px;min-width:22px;}
 select.si,input.si{
@@ -266,6 +268,11 @@ input.si.wide{width:54px;}
       <button class="cb" id="btn-pause">⏸ 정지</button>
       <button class="cb" id="btn-reset">⏹ 리셋</button>
       <button class="cb" id="btn-upd">⟳ 업데이트</button>
+    </div>
+    <div class="speed-wrap" style="margin-left:8px;">
+      <span>🔍</span>
+      <input type="range" id="zoom-slider" min="10" max="500" step="5" value="140" style="width:100px;accent-color:var(--cyan);">
+      <span id="zoom-lbl" style="color:var(--cyan);min-width:32px;font-size:11px;">1.0x</span>
     </div>
   </div>
   <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
@@ -430,6 +437,24 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
 controls.target.set(0, 0, 0);
+
+// Zoom slider
+const zoomSlider = document.getElementById('zoom-slider');
+const zoomLbl = document.getElementById('zoom-lbl');
+const baseZoomDist = 140;
+function updateZoomFromSlider() {
+  const val = parseFloat(zoomSlider.value);
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, val);
+  zoomLbl.textContent = (baseZoomDist / val).toFixed(1) + 'x';
+}
+zoomSlider.addEventListener('input', updateZoomFromSlider);
+// Sync slider when user scrolls/pinches to zoom
+controls.addEventListener('change', () => {
+  const dist = camera.position.distanceTo(controls.target);
+  zoomSlider.value = Math.min(500, Math.max(10, dist));
+  zoomLbl.textContent = (baseZoomDist / dist).toFixed(1) + 'x';
+});
 
 // Lights
 scene.add(new THREE.AmbientLight(0x404040, 3));
@@ -1925,6 +1950,69 @@ function delStep(id) {
   renderSteps(); buildWire();
 }
 
+// Engineering validation — checks each step for physical impossibility
+function validateSteps(stepsArr) {
+  const wd = parseFloat(document.getElementById('rng-diam')?.value) || 4;
+  const R = wd * (parseFloat(document.getElementById('rng-rfactor')?.value) || 1.5);
+  const warnings = []; // [{idx, msg}]
+  let lastType = null;
+  let consecutiveBends = 0;
+  let lastFeedLen = 0;
+  let totalBendAngle = 0;
+
+  stepsArr.forEach((step, i) => {
+    const msgs = [];
+
+    if (step.type === 'FEED') {
+      const len = parseFloat(step.p1) || 0;
+      if (len > 0 && len < wd) {
+        msgs.push(`⚠ FEED ${len}mm < 선경 ${wd}mm — 너무 짧음`);
+      }
+      if (len > 0 && len < R && lastType === 'BEND') {
+        msgs.push(`⚠ FEED ${len}mm < 벤드반경 ${R}mm — 다음 벤드 간섭 가능`);
+      }
+      lastFeedLen = len;
+      consecutiveBends = 0;
+    }
+
+    if (step.type === 'BEND') {
+      const travel = parseFloat(step.p1) || 0;
+      const angle = parseFloat(step.bendAngle) || ((travel / 10) * 90 * (4.0 / wd));
+      
+      if (Math.abs(angle) > 170) {
+        msgs.push(`🚫 벤드 ${Math.round(angle)}° > 170° — 물리적 한계 초과`);
+      } else if (Math.abs(angle) > 135) {
+        msgs.push(`⚠ 벤드 ${Math.round(angle)}° > 135° — 극한 벤딩, 스프링백 큼`);
+      }
+
+      if (lastType === 'BEND') {
+        consecutiveBends++;
+        msgs.push(`⚠ 연속 벤드 ${consecutiveBends+1}회 — FEED 없이 연속 벤딩`);
+      } else {
+        consecutiveBends = 0;
+      }
+
+      totalBendAngle += Math.abs(angle);
+      if (totalBendAngle > 350) {
+        msgs.push(`⚠ 누적 벤드 ${Math.round(totalBendAngle)}° — 와이어 사출기 뒤로 갈 수 있음`);
+      }
+
+      if (lastFeedLen > 0 && lastFeedLen < wd * 1.5 && lastType === 'FEED') {
+        msgs.push(`⚠ 직전 FEED ${lastFeedLen}mm 짧음 — 슬라이드 간섭 가능`);
+      }
+    }
+
+    if (step.type === 'CUT' && i === 0) {
+      msgs.push(`🚫 첫 스텝이 CUT — FEED 먼저 필요`);
+    }
+
+    lastType = step.type;
+    if (msgs.length > 0) warnings.push({ idx: i, msgs });
+  });
+
+  return warnings;
+}
+
 function setStep(id, k, v) {
   const s = steps.find(s => s.id === id);
   if (!s) return;
@@ -1995,6 +2083,19 @@ function renderSteps() {
     }
     row.appendChild(del);
     list.appendChild(row);
+  });
+
+  // Engineering validation
+  const warns = validateSteps(steps);
+  const rows = list.querySelectorAll('.steprow');
+  warns.forEach(w => {
+    if (rows[w.idx]) {
+      rows[w.idx].classList.add('eng-warn');
+      const msgEl = document.createElement('div');
+      msgEl.className = 'eng-msg';
+      msgEl.innerHTML = w.msgs.join('<br>');
+      rows[w.idx].appendChild(msgEl);
+    }
   });
 }
 
