@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CNC 와이어 포밍 시뮬레이터 v3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#090909;--panel:#0f0f0f;--row:#161616;--border:#252525;
+  --green:#00ff88;--gdim:#00aa55;--cyan:#00d4ff;--yellow:#ffcc00;
+  --red:#ff4444;--text:#ddd;--dim:#666;--font:'Courier New',monospace;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);}
+#app{display:flex;flex-direction:column;height:100vh;}
+
+/* Header */
+#hdr{
+  background:#0a0a0a;border-bottom:2px solid var(--gdim);
+  padding:6px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;
+}
+.tabs{display:flex;gap:3px;}
+.tab{
+  background:#181818;border:1px solid var(--border);color:var(--dim);
+  padding:5px 14px;cursor:pointer;font-family:var(--font);font-size:12px;transition:.15s;
+}
+.tab.on{background:var(--gdim);color:#000;border-color:var(--green);font-weight:bold;}
+.pbc{display:flex;gap:4px;align-items:center;margin-left:auto;flex-wrap:wrap;}
+.cb{
+  background:#1a1a1a;border:1px solid var(--border);color:var(--text);
+  padding:5px 11px;cursor:pointer;font-family:var(--font);font-size:12px;transition:.15s;
+}
+.cb:hover{border-color:var(--green);color:var(--green);}
+.cb.on{background:var(--green);color:#000;border-color:var(--green);}
+#stepind{font-size:11px;color:var(--cyan);min-width:90px;text-align:right;}
+
+/* Main */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* Left Panel */
+#lp{
+  width:400px;min-width:260px;background:var(--panel);
+  border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;
+}
+.sec{border-bottom:1px solid var(--border);padding:7px 9px;}
+.sectitle{font-size:10px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:7px;}
+
+/* Wire settings */
+.wsettings{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.wg{display:flex;flex-direction:column;gap:2px;}
+.wlabel{font-size:10px;color:var(--dim);}
+.wi{
+  background:#080808;border:1px solid var(--border);color:var(--green);
+  padding:3px 7px;font-family:var(--font);font-size:12px;width:100%;
+}
+.wi:focus{outline:none;border-color:var(--green);}
+
+/* Presets */
+.presets{display:flex;flex-wrap:wrap;gap:4px;}
+.prbtn{
+  background:#181818;border:1px solid var(--border);color:#999;
+  padding:3px 9px;cursor:pointer;font-size:10px;font-family:var(--font);transition:.15s;
+}
+.prbtn:hover{border-color:var(--cyan);color:var(--cyan);}
+
+/* Step editor */
+#se{flex:1;overflow-y:auto;padding:6px 5px;}
+.steprow{
+  display:flex;align-items:center;gap:3px;padding:3px 5px;margin-bottom:2px;
+  background:var(--row);border:1px solid transparent;border-left:3px solid transparent;transition:.15s;
+  font-size:11px;min-height:26px;
+}
+.steprow:hover{border-color:var(--border);}
+.steprow.playing{border-left-color:var(--yellow);background:#1e1c00;}
+.steprow.done{border-left-color:var(--gdim);}
+.stepnum{color:var(--dim);font-size:11px;min-width:22px;}
+select.si,input.si{
+  background:#0c0c0c;border:1px solid #2a2a2a;color:var(--text);
+  font-family:var(--font);font-size:11px;padding:2px 3px;height:22px;
+}
+select.si{min-width:62px;}
+input.si{width:46px;}
+input.si.wide{width:54px;}
+.slabel{color:var(--dim);font-size:10px;white-space:nowrap;}
+.sdel{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 3px;line-height:1;margin-left:1px;}
+.addbtn{
+  width:100%;background:#0f0f0f;border:1px dashed #333;color:var(--gdim);
+  padding:6px;cursor:pointer;font-family:var(--font);font-size:12px;margin-top:5px;transition:.15s;
+}
+.addbtn:hover{border-color:var(--green);color:var(--green);}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:#111;}
+::-webkit-scrollbar-thumb{background:#333;}
+::-webkit-scrollbar-thumb:hover{background:var(--gdim);}
+
+/* Right Panel */
+#rp{flex:1;position:relative;overflow:hidden;}
+#c3d{display:block;width:100%;height:100%;}
+#lbl-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;}
+
+/* Footer */
+#ftr{
+  background:#0a0a0a;border-top:1px solid var(--border);
+  padding:4px 12px;display:flex;gap:20px;font-size:11px;color:var(--dim);flex-shrink:0;flex-wrap:wrap;
+}
+#ftr span b{color:var(--cyan);}
+
+/* Step labels */
+.slbl{
+  background:rgba(0,200,100,.85);color:#000;padding:1px 5px;
+  font-size:9px;font-family:monospace;border-radius:2px;white-space:nowrap;font-weight:bold;
+  pointer-events:none;
+}
+.slbl.rq{background:rgba(0,180,255,.85);}
+.slbl.cut{background:rgba(255,80,80,.85);color:#fff;}
+.slbl.sm{background:rgba(255,200,0,.85);}
+.slbl.sol{background:rgba(160,80,255,.85);}
+
+/* Responsive */
+@media(max-width:750px){
+  #main{flex-direction:column;}
+  #lp{width:100%;height:45vh;border-right:none;border-bottom:2px solid var(--border);}
+  #rp{height:55vh;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr">
+    <div class="tabs">
+      <button class="tab on" id="tab1">1번 기계 (서보 CNC)</button>
+      <button class="tab" id="tab2">2번 기계 (캠식 AI-TECH)</button>
+    </div>
+    <div class="pbc">
+      <span id="stepind">STEP: --</span>
+      <button class="cb" id="btn-play">▶ 재생</button>
+      <button class="cb" id="btn-pause">⏸ 정지</button>
+      <button class="cb" id="btn-reset">⏹ 리셋</button>
+      <button class="cb" id="btn-upd">⟳ 업데이트</button>
+    </div>
+  </div>
+  <div id="main">
+    <div id="lp">
+      <div class="sec">
+        <div class="sectitle">와이어 설정</div>
+        <div class="wsettings">
+          <div class="wg"><span class="wlabel">선경 (mm)</span>
+            <input class="wi" id="wdiam" type="number" value="4.0" step="0.1" min="0.5" max="10"></div>
+          <div class="wg"><span class="wlabel">소재</span>
+            <select class="wi" id="wmat">
+              <option value="steel">강선 Steel</option>
+              <option value="stainless">스테인레스</option>
+              <option value="copper">동선 Copper</option>
+              <option value="spring">스프링강</option>
+            </select></div>
+          <div class="wg"><span class="wlabel">벤딩 반경계수</span>
+            <input class="wi" id="bradius" type="number" value="1.5" step="0.1" min="0.5" max="5"></div>
+          <div class="wg"><span class="wlabel">축 가이드</span>
+            <select class="wi" id="showguide">
+              <option value="1">표시</option>
+              <option value="0">숨김</option>
+            </select></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sectitle">프리셋</div>
+        <div class="presets" id="prbtnwrap"></div>
+      </div>
+      <div class="sec" style="padding-bottom:4px;">
+        <div class="sectitle">프로그램 에디터 <span style="color:var(--dim);font-size:9px;" id="minfo">— 1번 기계</span></div>
+      </div>
+      <div id="se">
+        <div id="steplist"></div>
+        <button class="addbtn" id="addstepbtn">+ 스텝 추가</button>
+      </div>
+    </div>
+    <div id="rp">
+      <canvas id="c3d"></canvas>
+      <div id="lbl-layer"></div>
+    </div>
+  </div>
+  <div id="ftr">
+    <span>총 길이: <b id="s-len">0.0</b> mm</span>
+    <span>스텝: <b id="s-steps">0</b></span>
+    <span>사이클 타임: <b id="s-cycle">0.0</b> s (추정)</span>
+    <span>바운딩: <b id="s-bbox">—</b> mm</span>
+    <span id="s-machine" style="margin-left:auto;color:var(--gdim);">1번 기계 (서보 CNC)</span>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+let machine = 1;
+let steps = [];
+let stepIdSeq = 0;
+let wirePoints = [];
+let stepMarkers = [];
+let animPlaying = false;
+let animProgress = 0;
+let animCurStep = -1;
+let labelObjs = [];
+
+// ══════════════════════════════════════════════════════════════════
+// THREE.JS SETUP
+// ══════════════════════════════════════════════════════════════════
+const rp = document.getElementById('rp');
+const canvas = document.getElementById('c3d');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x090909);
+renderer.shadowMap.enabled = true;
+
+const lblRenderer = new CSS2DRenderer();
+lblRenderer.setSize(rp.clientWidth, rp.clientHeight);
+lblRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+document.getElementById('lbl-layer').appendChild(lblRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x090909, 300, 800);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+camera.position.set(70, 55, 85);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.target.set(0, 10, 0);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x303030, 3));
+const dl = new THREE.DirectionalLight(0xffffff, 4);
+dl.position.set(60, 100, 80);
+dl.castShadow = true;
+scene.add(dl);
+scene.add(new THREE.PointLight(0x00ff88, 2, 200).position.set(-40, 50, 30) && new THREE.PointLight(0x00ff88, 2, 200));
+
+// Grid
+const grid = new THREE.GridHelper(300, 60, 0x1a1a1a, 0x141414);
+scene.add(grid);
+
+// Small origin axes
+const ah = new THREE.AxesHelper(12);
+ah.position.set(-90, 0.1, -90);
+scene.add(ah);
+
+// ══════════════════════════════════════════════════════════════════
+// AXIS GUIDE (X1~X8 radial)
+// ══════════════════════════════════════════════════════════════════
+let guideGroup = null;
+const AXIS_COLORS = ['#00ff88','#44ff66','#00ffcc','#00bbff','#0077ff','#6655ff','#cc33ff','#ff44cc'];
+const AXIS_NAMES  = ['X1','X2','X3','X4','X5','X6','X7','X8'];
+
+function buildAxisGuide() {
+  if (guideGroup) { scene.remove(guideGroup); guideGroup = null; }
+  guideGroup = new THREE.Group();
+  const GL = 50;
+
+  for (let i = 0; i < 8; i++) {
+    const ang = THREE.MathUtils.degToRad(i * 45);
+    // Guide in YZ plane (perpendicular to wire feed +X)
+    const dir = new THREE.Vector3(0, Math.cos(ang), Math.sin(ang));
+    const end = dir.clone().multiplyScalar(GL);
+
+    // Line
+    const col = parseInt(AXIS_COLORS[i].replace('#',''), 16);
+    const mat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.25 });
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), end]);
+    guideGroup.add(new THREE.Line(geo, mat));
+
+    // Small cone at tip
+    const cg = new THREE.ConeGeometry(1.2, 4, 6);
+    const cm = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.4 });
+    const cone = new THREE.Mesh(cg, cm);
+    cone.position.copy(end);
+    cone.lookAt(0, 0, 0);
+    cone.rotateX(-Math.PI / 2);
+    guideGroup.add(cone);
+
+    // Label
+    const el = document.createElement('div');
+    el.className = 'slbl';
+    el.style.background = AXIS_COLORS[i] + 'cc';
+    el.style.color = i < 4 ? '#000' : '#000';
+    el.textContent = AXIS_NAMES[i];
+    const lobj = new CSS2DObject(el);
+    lobj.position.copy(end.clone().multiplyScalar(1.15));
+    guideGroup.add(lobj);
+  }
+
+  // Circle outline in YZ plane
+  const cirPts = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * Math.PI * 2;
+    cirPts.push(new THREE.Vector3(0, Math.cos(a) * GL, Math.sin(a) * GL));
+  }
+  const cirGeo = new THREE.BufferGeometry().setFromPoints(cirPts);
+  const cirMat = new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.5 });
+  guideGroup.add(new THREE.Line(cirGeo, cirMat));
+
+  scene.add(guideGroup);
+}
+
+function setGuideVisible(v) {
+  if (guideGroup) guideGroup.visible = v;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// WIRE MATERIALS
+// ══════════════════════════════════════════════════════════════════
+const MATS = {
+  steel:     new THREE.MeshStandardMaterial({ color: 0xbbbbbb, metalness: 0.92, roughness: 0.18 }),
+  stainless: new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.95, roughness: 0.10 }),
+  copper:    new THREE.MeshStandardMaterial({ color: 0xcc7733, metalness: 0.88, roughness: 0.25 }),
+  spring:    new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.85, roughness: 0.20 }),
+};
+const ANIM_MAT = new THREE.LineBasicMaterial({ color: 0x00ff88, linewidth: 2 });
+
+let wireMesh = null;
+let animLine = null;
+
+// ══════════════════════════════════════════════════════════════════
+// WIRE GENERATION MATH
+// ══════════════════════════════════════════════════════════════════
+function getBendDir(axisNum, up, right) {
+  const ang = THREE.MathUtils.degToRad((axisNum - 1) * 45);
+  return new THREE.Vector3()
+    .addScaledVector(up.clone().normalize(), Math.cos(ang))
+    .addScaledVector(right.clone().normalize(), Math.sin(ang))
+    .normalize();
+}
+
+function generateArc(pos, forward, up, bendDir, bendDeg, R) {
+  const pts = [];
+  const absAng = Math.min(Math.abs(bendDeg), 360);
+  if (absAng < 0.5 || R < 0.01) return { pts, newFwd: forward.clone(), newUp: up.clone() };
+  const rad = THREE.MathUtils.degToRad(absAng);
+  const sign = bendDeg >= 0 ? 1 : -1;
+  const bDir = bendDir.clone().multiplyScalar(sign);
+  const arcAxis = new THREE.Vector3().crossVectors(forward, bDir);
+  if (arcAxis.length() < 1e-5) return { pts, newFwd: forward.clone(), newUp: up.clone() };
+  arcAxis.normalize();
+  const center = pos.clone().addScaledVector(bDir, R);
+  const nSegs = Math.max(8, Math.ceil(absAng / 4));
+  for (let j = 1; j <= nSegs; j++) {
+    const t = (j / nSegs) * rad;
+    const offset = bDir.clone().negate().applyAxisAngle(arcAxis, t).multiplyScalar(R);
+    pts.push(center.clone().add(offset));
+  }
+  const newFwd = forward.clone().applyAxisAngle(arcAxis, rad).normalize();
+  const newUp  = up.clone().applyAxisAngle(arcAxis, rad).normalize();
+  return { pts, newFwd, newUp };
+}
+
+function generateWire(stepsArr, wireDiam, bendRFactor) {
+  const all = [new THREE.Vector3()];
+  const markers = [];
+  let pos = new THREE.Vector3();
+  let fwd = new THREE.Vector3(1, 0, 0);
+  let up  = new THREE.Vector3(0, 1, 0);
+  let totalLen = 0;
+
+  stepsArr.forEach((step, i) => {
+    const startIdx = all.length - 1;
+
+    switch (step.type) {
+      case 'FEED': {
+        const len = Math.max(parseFloat(step.p1) || 0, 0);
+        if (len > 0.01) {
+          const segs = Math.max(2, Math.ceil(len / 2));
+          for (let k = 1; k <= segs; k++)
+            all.push(pos.clone().addScaledVector(fwd, (k / segs) * len));
+          pos = all[all.length - 1].clone();
+          totalLen += len;
+        } else { all.push(pos.clone()); }
+        break;
+      }
+
+      case 'BEND': {
+        const axN = parseInt(step.axis) || 1;
+        const travel = parseFloat(step.p1) || 0;
+        if (Math.abs(travel) > 0.01) {
+          const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+          const bDir = getBendDir(axN, up, right);
+          const R = wireDiam * bendRFactor;
+          const angDeg = (travel / 10) * 90 * (4.0 / wireDiam);
+          const res = generateArc(pos, fwd, up, bDir, angDeg, R);
+          res.pts.forEach(p => all.push(p));
+          if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
+          fwd = res.newFwd;
+          up  = res.newUp;
+          totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
+        } else { all.push(pos.clone()); }
+        break;
+      }
+
+      case 'RQ': {
+        const ang = parseFloat(step.p1) || 0;
+        up.applyAxisAngle(fwd.clone().normalize(), THREE.MathUtils.degToRad(ang));
+        up.normalize();
+        all.push(pos.clone());
+        break;
+      }
+
+      case 'SM': {
+        const rots = Math.max(parseFloat(step.p1) || 1, 0.1);
+        const cd   = Math.max(parseFloat(step.p2) || 10, 1);
+        const CR   = cd / 2;
+        const pitch = wireDiam * 1.1;
+        const totalAng = rots * Math.PI * 2;
+        const segs = Math.ceil(rots * 40);
+        const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+        for (let k = 1; k <= segs; k++) {
+          const t = (k / segs) * totalAng;
+          all.push(
+            pos.clone()
+              .addScaledVector(fwd, (t / totalAng) * rots * pitch)
+              .addScaledVector(right, CR * (Math.cos(t) - 1))
+              .addScaledVector(up, CR * Math.sin(t))
+          );
+        }
+        pos = all[all.length - 1].clone();
+        totalLen += rots * Math.PI * cd;
+        break;
+      }
+
+      case 'CAM': {
+        const a1 = parseFloat(step.p1) || 0;
+        const a2 = parseFloat(step.p2) || 90;
+        const diff = a2 - a1;
+        if (Math.abs(diff) > 0.5) {
+          const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+          const bDir = getBendDir(1, up, right);
+          const R = wireDiam * bendRFactor;
+          const angDeg = diff * 0.85;
+          const res = generateArc(pos, fwd, up, bDir, angDeg, R);
+          res.pts.forEach(p => all.push(p));
+          if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
+          fwd = res.newFwd;
+          up  = res.newUp;
+          totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
+        } else { all.push(pos.clone()); }
+        break;
+      }
+
+      case 'CUT':
+      case 'SOL':
+      default:
+        all.push(pos.clone());
+        break;
+    }
+
+    const endIdx = all.length - 1;
+    const midIdx = Math.floor((startIdx + endIdx) / 2);
+    markers.push({ i, type: step.type, axis: step.axis, startIdx, endIdx, pos: all[midIdx].clone() });
+  });
+
+  // Bounding box
+  const box = new THREE.Box3().setFromPoints(all);
+  const sz  = new THREE.Vector3(); box.getSize(sz);
+  const ctr = new THREE.Vector3(); box.getCenter(ctr);
+
+  return { all, markers, totalLen, bbox: sz, center: ctr };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// BUILD / CLEAR 3D WIRE
+// ══════════════════════════════════════════════════════════════════
+function clearWire() {
+  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh = null; }
+  if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
+  labelObjs.forEach(o => { o.element.remove(); scene.remove(o); });
+  labelObjs = [];
+}
+
+function buildWire() {
+  clearWire();
+  if (!steps.length) return;
+  const wd = parseFloat(document.getElementById('wdiam').value) || 4;
+  const br = parseFloat(document.getElementById('bradius').value) || 1.5;
+  const matKey = document.getElementById('wmat').value;
+
+  const res = generateWire(steps, wd, br);
+  wirePoints  = res.all;
+  stepMarkers = res.markers;
+
+  if (wirePoints.length < 2) { updateStats(res); return; }
+
+  // Tube mesh
+  try {
+    const curve = new THREE.CatmullRomCurve3(wirePoints, false, 'catmullrom', 0.5);
+    const segs  = Math.max(wirePoints.length * 3, 30);
+    const geo   = new THREE.TubeGeometry(curve, segs, wd / 2, 8, false);
+    wireMesh    = new THREE.Mesh(geo, MATS[matKey] || MATS.steel);
+    wireMesh.castShadow = true;
+    scene.add(wireMesh);
+  } catch (e) { console.warn('TubeGeometry failed', e); }
+
+  // Step labels
+  res.markers.forEach(mk => {
+    const step = steps[mk.i];
+    if (!step) return;
+    const cls = ({'RQ':'rq','CUT':'cut','SM':'sm','SOL':'sol'})[mk.type] || '';
+    const el = document.createElement('div');
+    el.className = 'slbl ' + cls;
+    el.textContent = String(mk.i).padStart(2,'0') + ' ' + mk.type + (mk.axis && mk.type==='BEND' ? mk.axis : '');
+    const lobj = new CSS2DObject(el);
+    lobj.position.copy(mk.pos).addScaledVector(new THREE.Vector3(0,1,0), wd * 2.5);
+    scene.add(lobj);
+    labelObjs.push(lobj);
+  });
+
+  updateStats(res);
+  fitCamera(res.center, res.bbox);
+}
+
+function fitCamera(ctr, sz) {
+  const md = Math.max(sz.x, sz.y, sz.z, 20);
+  camera.position.set(ctr.x + md * 1.2, ctr.y + md * 0.9, ctr.z + md * 1.5);
+  controls.target.copy(ctr);
+  controls.update();
+}
+
+function updateStats(res) {
+  document.getElementById('s-len').textContent = (res.totalLen || 0).toFixed(1);
+  document.getElementById('s-steps').textContent = steps.length;
+  const ct = steps.reduce((s, st) => s + 0.4 * (100 / Math.max(parseFloat(st.speed) || 100, 1)), 0);
+  document.getElementById('s-cycle').textContent = ct.toFixed(1);
+  if (res.bbox)
+    document.getElementById('s-bbox').textContent =
+      `${res.bbox.x.toFixed(0)}×${res.bbox.y.toFixed(0)}×${res.bbox.z.toFixed(0)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANIMATION
+// ══════════════════════════════════════════════════════════════════
+function playAnim() {
+  if (!wirePoints.length) { buildWire(); if (!wirePoints.length) return; }
+  animProgress = 0;
+  animCurStep  = -1;
+  animPlaying  = true;
+  if (wireMesh) wireMesh.visible = false;
+  labelObjs.forEach(l => { l.element.style.display = 'none'; });
+  document.getElementById('btn-play').classList.add('on');
+}
+
+function pauseAnim() {
+  animPlaying = false;
+  document.getElementById('btn-play').classList.remove('on');
+}
+
+function resetAnim() {
+  pauseAnim();
+  animProgress = 0;
+  animCurStep  = -1;
+  if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
+  if (wireMesh) wireMesh.visible = true;
+  labelObjs.forEach(l => { l.element.style.display = ''; });
+  document.getElementById('stepind').textContent = 'STEP: --';
+  highlightStep(-1);
+}
+
+function tickAnim(dt) {
+  if (!animPlaying || wirePoints.length < 2) return;
+  const SPEED = 40; // pts/s base
+  animProgress = Math.min(animProgress + SPEED * dt, wirePoints.length - 1);
+
+  // Find current step
+  let cs = -1;
+  for (let i = 0; i < stepMarkers.length; i++) {
+    if (animProgress >= stepMarkers[i].startIdx) cs = i;
+    else break;
+  }
+
+  if (cs !== animCurStep) {
+    animCurStep = cs;
+    highlightStep(cs);
+    const st = cs >= 0 && steps[cs] ? steps[cs].type : '';
+    const ax = cs >= 0 && steps[cs] && steps[cs].axis && st === 'BEND' ? steps[cs].axis : '';
+    document.getElementById('stepind').textContent =
+      `STEP: ${String(cs).padStart(2,'0')} ${st}${ax ? ' X'+ax : ''}`;
+    // Show labels up to current
+    labelObjs.forEach((l, li) => { l.element.style.display = li <= cs ? '' : 'none'; });
+  }
+
+  // Draw partial wire as line (fast)
+  if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
+  const n = Math.ceil(animProgress) + 1;
+  const pts = wirePoints.slice(0, n);
+  if (pts.length >= 2) {
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    animLine = new THREE.Line(geo, ANIM_MAT);
+    scene.add(animLine);
+  }
+
+  if (animProgress >= wirePoints.length - 1) {
+    animPlaying = false;
+    document.getElementById('btn-play').classList.remove('on');
+    if (animLine) { scene.remove(animLine); animLine.geometry.dispose(); animLine = null; }
+    if (wireMesh) wireMesh.visible = true;
+    labelObjs.forEach(l => { l.element.style.display = ''; });
+    document.getElementById('stepind').textContent = 'STEP: 완료 ✓';
+  }
+}
+
+function highlightStep(idx) {
+  document.querySelectorAll('.steprow').forEach((r, i) => {
+    r.classList.toggle('playing', i === idx);
+    r.classList.toggle('done', i < idx);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STEP EDITOR
+// ══════════════════════════════════════════════════════════════════
+const TYPES_M1 = ['FEED','BEND','RQ','SM','CUT','SOL'];
+const TYPES_M2 = ['FEED','CAM','RQ','CUT'];
+function getTypes() { return machine === 1 ? TYPES_M1 : TYPES_M2; }
+
+function mkStep(type, o={}) {
+  return { id: ++stepIdSeq, type, axis:'1', p1:'10', p2:'', speed:'100', ...o };
+}
+
+function addStep(type, o={}) {
+  steps.push(mkStep(type || getTypes()[0], o));
+  renderSteps(); buildWire();
+}
+
+function delStep(id) {
+  steps = steps.filter(s => s.id !== id);
+  renderSteps(); buildWire();
+}
+
+function setStep(id, k, v) {
+  const s = steps.find(s => s.id === id);
+  if (s) { s[k] = v; buildWire(); }
+}
+
+function renderSteps() {
+  const list = document.getElementById('steplist');
+  list.innerHTML = '';
+
+  steps.forEach((step, idx) => {
+    const row = document.createElement('div');
+    row.className = 'steprow';
+    row.dataset.id = step.id;
+
+    const numEl = document.createElement('span');
+    numEl.className = 'stepnum';
+    numEl.textContent = String(idx).padStart(2,'0');
+    row.appendChild(numEl);
+
+    // Type
+    const typeEl = document.createElement('select');
+    typeEl.className = 'si';
+    typeEl.style.minWidth = '58px';
+    getTypes().forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      if (t === step.type) o.selected = true;
+      typeEl.appendChild(o);
+    });
+    typeEl.addEventListener('change', e => { setStep(step.id, 'type', e.target.value); renderSteps(); });
+    row.appendChild(typeEl);
+
+    // Params
+    buildParams(row, step);
+
+    // Speed
+    const spd = document.createElement('input');
+    spd.className = 'si'; spd.type='number';
+    spd.style.width='38px'; spd.value=step.speed;
+    spd.min=1; spd.max=100; spd.title='속도(%)';
+    spd.addEventListener('change', e => setStep(step.id,'speed',e.target.value));
+    row.appendChild(spd);
+    const spL = document.createElement('span');
+    spL.className='slabel'; spL.textContent='%';
+    row.appendChild(spL);
+
+    // Delete
+    const del = document.createElement('button');
+    del.className='sdel'; del.textContent='×'; del.title='삭제';
+    del.addEventListener('click', () => delStep(step.id));
+    row.appendChild(del);
+
+    list.appendChild(row);
+  });
+}
+
+function inp(id, val, w, ph) {
+  const el = document.createElement('input');
+  el.className = 'si'; el.type='number'; el.value=val;
+  el.style.width = w||'46px'; if (ph) el.placeholder=ph;
+  el.addEventListener('change', e => setStep(id,'_', 0)); // trigger below
+  return el;
+}
+
+function buildParams(row, step) {
+  function mkI(field, val, w, ph) {
+    const el = document.createElement('input');
+    el.className='si'; el.type='number'; el.value=val||''; el.style.width=w||'46px';
+    if(ph) el.placeholder=ph;
+    el.addEventListener('change', e => setStep(step.id, field, e.target.value));
+    el.addEventListener('input',  e => setStep(step.id, field, e.target.value));
+    return el;
+  }
+  function mkL(t) {
+    const el=document.createElement('span');el.className='slabel';el.textContent=t;return el;
+  }
+  function mkSel(opts, field, cur, w) {
+    const el=document.createElement('select');el.className='si';el.style.minWidth=w||'50px';
+    opts.forEach(([v,t])=>{ const o=document.createElement('option');o.value=v;o.textContent=t;
+      if(v===String(cur)) o.selected=true; el.appendChild(o); });
+    el.addEventListener('change', e => setStep(step.id, field, e.target.value));
+    return el;
+  }
+
+  switch(step.type) {
+    case 'FEED':
+      row.appendChild(mkI('p1', step.p1, '55px'));
+      row.appendChild(mkL('mm'));
+      break;
+
+    case 'BEND': {
+      const axes = Array.from({length:8},(_,i)=>[(i+1).toString(),`X${i+1}`]);
+      row.appendChild(mkSel(axes,'axis',step.axis,'48px'));
+      row.appendChild(mkI('p1',step.p1,'44px','mm'));
+      row.appendChild(mkL('mm'));
+      row.appendChild(mkSel([['BEND','BEND'],['PUSH','PUSH'],['HOLD','HOLD']],'bendType',step.bendType||'BEND','52px'));
+      break;
+    }
+
+    case 'RQ':
+      row.appendChild(mkI('p1', step.p1, '50px','°'));
+      row.appendChild(mkL('°'));
+      break;
+
+    case 'SM':
+      row.appendChild(mkI('p1', step.p1, '44px','rev'));
+      row.appendChild(mkL('rev'));
+      row.appendChild(mkI('p2', step.p2||'10', '42px','Φ'));
+      row.appendChild(mkL('Φmm'));
+      break;
+
+    case 'CAM':
+      row.appendChild(mkI('p1',step.p1,'44px','시작°'));
+      row.appendChild(mkL('→'));
+      row.appendChild(mkI('p2',step.p2||'90','44px','종료°'));
+      row.appendChild(mkL('°'));
+      break;
+
+    case 'CUT': {
+      const l=document.createElement('span');
+      l.style.cssText='color:#ff4444;font-size:11px;padding:0 4px;';l.textContent='✂ WIRE CUT';
+      row.appendChild(l); break;
+    }
+
+    case 'SOL': {
+      const sols=[['SOL01','SOL01'],['SOL02','SOL02'],['SOL03','SOL03'],['SOL04','SOL04']];
+      row.appendChild(mkSel(sols,'axis',step.axis||'SOL01','56px'));
+      row.appendChild(mkSel([['ON','ON'],['OFF','OFF']],'p1',step.p1||'ON','42px'));
+      break;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MACHINE SELECTION
+// ══════════════════════════════════════════════════════════════════
+function selectMachine(n) {
+  machine = n;
+  document.getElementById('tab1').classList.toggle('on', n===1);
+  document.getElementById('tab2').classList.toggle('on', n===2);
+  document.getElementById('minfo').textContent = n===1 ? '— 1번 기계 (서보 CNC)' : '— 2번 기계 (캠식 AI-TECH)';
+  document.getElementById('s-machine').textContent = n===1 ? '1번 기계 (서보 CNC)' : '2번 기계 (캠식 AI-TECH)';
+  buildPresetBtns();
+  loadPreset(n===1 ? 'uhook' : 'cam_simple');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PRESETS
+// ══════════════════════════════════════════════════════════════════
+const PRESETS = {
+  uhook: {
+    label:'U훅', m:1,
+    steps:[
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'BEND',axis:'1',p1:'14',speed:'65'},
+      {type:'FEED',p1:'5',speed:'80'},
+      {type:'BEND',axis:'1',p1:'14',speed:'65'},
+      {type:'FEED',p1:'5',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  sclip: {
+    label:'S클립', m:1,
+    steps:[
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'FEED',p1:'10',speed:'80'},
+      {type:'BEND',axis:'5',p1:'11',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  square: {
+    label:'사각 프레임', m:1,
+    steps:[
+      {type:'FEED',p1:'30',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'FEED',p1:'30',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'65'},
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  clip3d: {
+    label:'3D 클립', m:1,
+    steps:[
+      {type:'FEED',p1:'12',speed:'80'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'10',speed:'80'},
+      {type:'RQ',p1:'90',speed:'100'},
+      {type:'BEND',axis:'1',p1:'10',speed:'65'},
+      {type:'FEED',p1:'12',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  coil5: {
+    label:'코일 5권', m:1,
+    steps:[
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'SM',p1:'5',p2:'12',speed:'60'},
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  diggle: {
+    label:'Diggle형 4mm', m:1,
+    steps:[
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'BEND',axis:'1',p1:'9',speed:'65'},
+      {type:'FEED',p1:'6',speed:'80'},
+      {type:'BEND',axis:'3',p1:'10',speed:'65'},
+      {type:'RQ',p1:'45',speed:'100'},
+      {type:'FEED',p1:'12',speed:'80'},
+      {type:'BEND',axis:'5',p1:'9',speed:'65'},
+      {type:'FEED',p1:'6',speed:'80'},
+      {type:'BEND',axis:'7',p1:'10',speed:'65'},
+      {type:'RQ',p1:'-45',speed:'100'},
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  spring_torsion: {
+    label:'비틀림 스프링', m:1,
+    steps:[
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'60'},
+      {type:'SM',p1:'6',p2:'10',speed:'55'},
+      {type:'RQ',p1:'180',speed:'100'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'BEND',axis:'1',p1:'11',speed:'60'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  cam_simple: {
+    label:'CAM 단순 벤드', m:2,
+    steps:[
+      {type:'FEED',p1:'20',speed:'80'},
+      {type:'CAM',p1:'0',p2:'90',speed:'65'},
+      {type:'FEED',p1:'15',speed:'80'},
+      {type:'CAM',p1:'0',p2:'90',speed:'65'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  cam_spring: {
+    label:'CAM S클립', m:2,
+    steps:[
+      {type:'FEED',p1:'12',speed:'80'},
+      {type:'CAM',p1:'0',p2:'75',speed:'65'},
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'RQ',p1:'90',speed:'100'},
+      {type:'CAM',p1:'10',p2:'80',speed:'65'},
+      {type:'FEED',p1:'12',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+  cam_zigzag: {
+    label:'CAM 지그재그', m:2,
+    steps:[
+      {type:'FEED',p1:'10',speed:'80'},
+      {type:'CAM',p1:'0',p2:'60',speed:'65'},
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'CAM',p1:'0',p2:'120',speed:'60'},
+      {type:'FEED',p1:'8',speed:'80'},
+      {type:'CAM',p1:'0',p2:'60',speed:'65'},
+      {type:'FEED',p1:'10',speed:'80'},
+      {type:'CUT',speed:'100'},
+    ]
+  },
+};
+
+function loadPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  if (p.m && p.m !== machine) { selectMachine(p.m); return; }
+  steps = p.steps.map(s => mkStep(s.type, s));
+  renderSteps(); buildWire();
+}
+
+function buildPresetBtns() {
+  const wrap = document.getElementById('prbtnwrap');
+  wrap.innerHTML = '';
+  Object.entries(PRESETS).forEach(([k, p]) => {
+    if (p.m && p.m !== machine) return;
+    const btn = document.createElement('button');
+    btn.className = 'prbtn'; btn.textContent = p.label;
+    btn.addEventListener('click', () => loadPreset(k));
+    wrap.appendChild(btn);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ══════════════════════════════════════════════════════════════════
+let lastT = performance.now();
+function render() {
+  requestAnimationFrame(render);
+  const now = performance.now();
+  const dt  = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  controls.update();
+  tickAnim(dt);
+  renderer.render(scene, camera);
+  lblRenderer.render(scene, camera);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RESIZE
+// ══════════════════════════════════════════════════════════════════
+function onResize() {
+  const w = rp.clientWidth, h = rp.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  lblRenderer.setSize(w, h);
+}
+new ResizeObserver(onResize).observe(rp);
+
+// ══════════════════════════════════════════════════════════════════
+// EVENT BINDINGS
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('tab1').addEventListener('click', () => selectMachine(1));
+document.getElementById('tab2').addEventListener('click', () => selectMachine(2));
+document.getElementById('btn-play').addEventListener('click', () => {
+  animPlaying ? pauseAnim() : playAnim();
+});
+document.getElementById('btn-pause').addEventListener('click', pauseAnim);
+document.getElementById('btn-reset').addEventListener('click', resetAnim);
+document.getElementById('btn-upd').addEventListener('click', buildWire);
+document.getElementById('addstepbtn').addEventListener('click', () => addStep());
+document.getElementById('wdiam').addEventListener('change', buildWire);
+document.getElementById('wmat').addEventListener('change', buildWire);
+document.getElementById('bradius').addEventListener('change', buildWire);
+document.getElementById('showguide').addEventListener('change', e => setGuideVisible(e.target.value==='1'));
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+buildAxisGuide();
+buildPresetBtns();
+loadPreset('uhook');
+onResize();
+render();
+
+</script>
+</body>
+</html>
