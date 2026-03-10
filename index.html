@@ -1127,27 +1127,24 @@ function generateWire(stepsArr, wireDiam, bendRFactor) {
         const axN = parseInt(step.axis) || 1;
         const travel = parseFloat(step.p1) || 0;
         if (Math.abs(travel) > 0.01) {
+          // ★ v8 FIXED: fwd/up are ALWAYS the nozzle direction — never change.
+          // Axes are fixed on the machine frame, so bend directions are always
+          // calculated from the same fwd/up/right (nozzle coordinate system).
           const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
-          
-          // v6: getBendDir returns OPPOSITE of slide direction
           const bDir = getBendDir(axN, up, right);
           
           const R = wireDiam * bendRFactor;
           const angDeg = (travel / 10) * 90 * (4.0 / wireDiam);
+          
+          // Generate arc at current pos, bending from fwd toward bDir
           const res = generateArc(pos, fwd, up, bDir, angDeg, R);
           res.pts.forEach(p => all.push(p));
           if (res.pts.length) pos = res.pts[res.pts.length - 1].clone();
           
-          // ★ v7.1 fix: Do NOT rotate all existing points (caused double-rotation bug).
-          // Instead: update fwd/up to follow the arc (like v6), but FEED direction is
-          // determined by the NOZZLE. The transformWireForMachine() function handles
-          // the visual alignment by placing the last point at the origin with fwd direction.
-          // The key insight: each BEND changes the wire's local coordinate frame at the
-          // bend point, and subsequent FEED extends in the NEW direction after the bend.
-          // This is geometrically correct because in the machine, FEED pushes wire straight
-          // from the nozzle, and the already-bent portion moves away.
-          fwd = res.newFwd;
-          up = res.newUp;
+          // ★ KEY: Do NOT update fwd or up. The nozzle direction is fixed.
+          // Next FEED will go from pos (arc endpoint) in the original fwd direction.
+          // This creates the correct shape: straight sections are always parallel,
+          // with bends connecting them.
           totalLen += THREE.MathUtils.degToRad(Math.abs(angDeg)) * R;
         } else { all.push(pos.clone()); }
         break;
